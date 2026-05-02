@@ -1,0 +1,2 @@
+# VocabAI
+AI Vocab application 
