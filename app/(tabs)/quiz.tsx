@@ -1,8 +1,16 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { Text, Button, Surface, Chip } from 'react-native-paper';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { View, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
+import { Text, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useLocalSearchParams, router } from 'expo-router';
 import { QuizQuestion as QuizQuestionComponent } from '../../components';
+import {
+  useThemedColors,
+  NEO,
+  BRUTAL,
+  BRUTAL_SHADOW,
+  BRUTAL_SHADOW_SM,
+} from '../../constants/theme';
 import { useVocabulary } from '../../hooks';
 import { useUserStore } from '../../stores/userStore';
 import { QuizQuestion, QuizResult, VocabCategory } from '../../types';
@@ -14,6 +22,8 @@ type QuizState = 'setup' | 'playing' | 'completed';
 export default function QuizScreen() {
   const { isAuthenticated } = useUserStore();
   const { vocabularies, getVocabById } = useVocabulary();
+  const c = useThemedColors();
+  const params = useLocalSearchParams<{ category?: string; autoStart?: string }>();
 
   const [quizState, setQuizState] = useState<QuizState>('setup');
   const [selectedCategory, setSelectedCategory] = useState<VocabCategory | 'all'>('all');
@@ -22,22 +32,50 @@ export default function QuizScreen() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [results, setResults] = useState<QuizResult[]>([]);
 
-  // Filter vocabularies by category
   const filteredVocabularies = useMemo(() => {
     if (selectedCategory === 'all') return vocabularies;
     return vocabularies.filter((v) => v.category === selectedCategory);
   }, [vocabularies, selectedCategory]);
 
-  // Start quiz
-  const startQuiz = useCallback(() => {
-    const generatedQuestions = generateQuizQuestions(filteredVocabularies, questionCount);
-    setQuestions(generatedQuestions);
-    setCurrentQuestionIndex(0);
-    setResults([]);
-    setQuizState('playing');
-  }, [filteredVocabularies, questionCount]);
+  const startQuiz = useCallback(
+    (overrideCategory?: VocabCategory | 'all', overrideCount?: number) => {
+      const cat = overrideCategory ?? selectedCategory;
+      const pool = cat === 'all' ? vocabularies : vocabularies.filter((v) => v.category === cat);
+      const desired = overrideCount ?? questionCount;
+      const count = Math.min(desired, pool.length);
+      if (count < 4) return;
+      const generatedQuestions = generateQuizQuestions(pool, count);
+      setQuestions(generatedQuestions);
+      setCurrentQuestionIndex(0);
+      setResults([]);
+      setQuizState('playing');
+    },
+    [vocabularies, selectedCategory, questionCount]
+  );
 
-  // Handle answer
+  // Auto-start when arriving from the home deck-complete prompt.
+  useEffect(() => {
+    if (params.autoStart !== '1' || !params.category || vocabularies.length === 0) return;
+
+    const cat = params.category as VocabCategory | 'all';
+    const pool = cat === 'all' ? vocabularies : vocabularies.filter((v) => v.category === cat);
+
+    if (pool.length < 4) {
+      // Not enough cards for a quiz — drop into setup so the user sees why.
+      setSelectedCategory(cat);
+      router.setParams({ autoStart: undefined, category: undefined });
+      return;
+    }
+
+    const count = Math.min(10, pool.length);
+    setSelectedCategory(cat);
+    setQuestionCount(count);
+    startQuiz(cat, count);
+    // Clear params so this doesn't re-fire if the user navigates back here.
+    router.setParams({ autoStart: undefined, category: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.autoStart, params.category, vocabularies.length]);
+
   const handleAnswer = useCallback(
     (answer: string, correct: boolean) => {
       const currentQuestion = questions[currentQuestionIndex];
@@ -60,7 +98,6 @@ export default function QuizScreen() {
     [currentQuestionIndex, questions]
   );
 
-  // Calculate score
   const score = useMemo(() => {
     const correct = results.filter((r) => r.correct).length;
     const total = results.length;
@@ -68,7 +105,6 @@ export default function QuizScreen() {
     return { correct, total, percentage };
   }, [results]);
 
-  // Reset quiz
   const resetQuiz = useCallback(() => {
     setQuizState('setup');
     setQuestions([]);
@@ -78,92 +114,99 @@ export default function QuizScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
         <View style={styles.authPrompt}>
-          <Text style={styles.authText}>Sign in to take quizzes</Text>
+          <Text style={styles.authText}>SIGN IN TO TAKE QUIZZES</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Setup Screen
   if (quizState === 'setup') {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
         <ScrollView contentContainerStyle={styles.setupContainer}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Quiz Mode</Text>
-            <Text style={styles.subtitle}>Test your knowledge</Text>
+          <View style={styles.heroBanner}>
+            <Text style={styles.heroEyebrow}>QUIZ MODE</Text>
+            <Text style={styles.heroTitle}>TEST YOURSELF</Text>
+            <Text style={styles.heroSubtitle}>{vocabularies.length} TERMS AVAILABLE</Text>
           </View>
 
-          {/* Category Selection */}
-          <Surface style={styles.card} elevation={2}>
-            <Text style={styles.cardTitle}>Select Category</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>SELECT CATEGORY</Text>
             <View style={styles.categoryChips}>
-              <Chip
+              <CategoryChip
+                label={`ALL (${vocabularies.length})`}
                 selected={selectedCategory === 'all'}
                 onPress={() => setSelectedCategory('all')}
-                style={styles.chip}
-              >
-                All ({vocabularies.length})
-              </Chip>
+              />
               {CATEGORIES.map((cat) => {
                 const count = vocabularies.filter((v) => v.category === cat.id).length;
                 return (
-                  <Chip
+                  <CategoryChip
                     key={cat.id}
+                    label={`${cat.name.split(' ')[0].toUpperCase()} (${count})`}
                     selected={selectedCategory === cat.id}
-                    onPress={() => setSelectedCategory(cat.id)}
-                    style={styles.chip}
+                    onPress={() => count > 0 && setSelectedCategory(cat.id)}
                     disabled={count === 0}
-                  >
-                    {cat.name.split(' ')[0]} ({count})
-                  </Chip>
+                    color={cat.color}
+                  />
                 );
               })}
             </View>
-          </Surface>
+          </View>
 
-          {/* Question Count */}
-          <Surface style={styles.card} elevation={2}>
-            <Text style={styles.cardTitle}>Number of Questions</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>QUESTIONS</Text>
             <View style={styles.countButtons}>
-              {[5, 10, 15, 20].map((count) => (
-                <Button
-                  key={count}
-                  mode={questionCount === count ? 'contained' : 'outlined'}
-                  onPress={() => setQuestionCount(count)}
-                  style={styles.countButton}
-                  disabled={count > filteredVocabularies.length}
-                >
-                  {count}
-                </Button>
-              ))}
+              {[5, 10, 15, 20].map((count) => {
+                const isSelected = questionCount === count;
+                const disabled = count > filteredVocabularies.length;
+                return (
+                  <Pressable
+                    key={count}
+                    onPress={() => !disabled && setQuestionCount(count)}
+                    disabled={disabled}
+                    style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.85 : 1 }]}
+                  >
+                    <View
+                      style={[
+                        styles.countButton,
+                        {
+                          backgroundColor: isSelected ? NEO.yellow : NEO.white,
+                          opacity: disabled ? 0.4 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.countText}>{count}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
-          </Surface>
+          </View>
 
-          {/* Start Button */}
           <Button
             mode="contained"
-            onPress={startQuiz}
+            onPress={() => startQuiz()}
             style={styles.startButton}
             contentStyle={styles.startButtonContent}
             disabled={filteredVocabularies.length < 4}
+            buttonColor={NEO.lime}
+            textColor={NEO.ink}
+            labelStyle={styles.startLabel}
           >
-            Start Quiz
+            START QUIZ
           </Button>
 
           {filteredVocabularies.length < 4 && (
-            <Text style={styles.warningText}>
-              Need at least 4 terms to create a quiz
-            </Text>
+            <Text style={styles.warningText}>NEED AT LEAST 4 TERMS</Text>
           )}
         </ScrollView>
       </SafeAreaView>
     );
   }
 
-  // Playing Screen
   if (quizState === 'playing') {
     const currentQuestion = questions[currentQuestionIndex];
     const vocab = getVocabById(currentQuestion.vocabId);
@@ -171,7 +214,7 @@ export default function QuizScreen() {
     if (!vocab) return null;
 
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
         <QuizQuestionComponent
           question={currentQuestion}
           vocabulary={vocab}
@@ -183,69 +226,83 @@ export default function QuizScreen() {
     );
   }
 
-  // Completed Screen
+  const scoreColor =
+    score.percentage >= 70 ? NEO.lime : score.percentage >= 50 ? NEO.yellow : NEO.orange;
+  const trophyIcon =
+    score.percentage >= 70 ? 'trophy' : score.percentage >= 50 ? 'thumb-up' : 'refresh';
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
       <ScrollView contentContainerStyle={styles.completedContainer}>
-        <View style={styles.resultIcon}>
-          <MaterialCommunityIcons
-            name={score.percentage >= 70 ? 'trophy' : score.percentage >= 50 ? 'thumb-up' : 'refresh'}
-            size={80}
-            color={score.percentage >= 70 ? '#F59E0B' : score.percentage >= 50 ? '#6366F1' : '#6B7280'}
-          />
+        <View style={[styles.resultIcon, { backgroundColor: scoreColor }]}>
+          <MaterialCommunityIcons name={trophyIcon} size={64} color={NEO.ink} />
         </View>
 
         <Text style={styles.resultTitle}>
-          {score.percentage >= 70 ? 'Excellent!' : score.percentage >= 50 ? 'Good job!' : 'Keep practicing!'}
+          {score.percentage >= 70
+            ? 'EXCELLENT!'
+            : score.percentage >= 50
+              ? 'GOOD JOB!'
+              : 'KEEP PRACTICING'}
         </Text>
 
-        <Surface style={styles.scoreCard} elevation={3}>
+        <View style={[styles.scoreCard, { backgroundColor: scoreColor }]}>
           <Text style={styles.scorePercentage}>{score.percentage}%</Text>
           <Text style={styles.scoreDetail}>
-            {score.correct} out of {score.total} correct
+            {score.correct} OF {score.total} CORRECT
           </Text>
-        </Surface>
+        </View>
 
-        {/* Results Summary */}
-        <Surface style={styles.summaryCard} elevation={2}>
-          <Text style={styles.summaryTitle}>Results Summary</Text>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>RESULTS</Text>
           {results.map((result, index) => {
             const question = questions[index];
             const vocab = getVocabById(question.vocabId);
             return (
               <View key={index} style={styles.resultItem}>
-                <MaterialCommunityIcons
-                  name={result.correct ? 'check-circle' : 'close-circle'}
-                  size={20}
-                  color={result.correct ? '#10B981' : '#EF4444'}
-                />
+                <View
+                  style={[
+                    styles.resultIconSmall,
+                    { backgroundColor: result.correct ? NEO.lime : NEO.red },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name={result.correct ? 'check' : 'close'}
+                    size={16}
+                    color={NEO.ink}
+                  />
+                </View>
                 <View style={styles.resultItemText}>
                   <Text style={styles.resultTerm}>{vocab?.term}</Text>
                   {!result.correct && (
-                    <Text style={styles.resultCorrect}>
-                      Correct: {question.correctAnswer}
-                    </Text>
+                    <Text style={styles.resultCorrect}>ANSWER: {question.correctAnswer}</Text>
                   )}
                 </View>
               </View>
             );
           })}
-        </Surface>
+        </View>
 
         <View style={styles.actionButtons}>
           <Button
-            mode="outlined"
+            mode="contained"
             onPress={resetQuiz}
             style={styles.actionButton}
+            buttonColor={NEO.white}
+            textColor={NEO.ink}
+            labelStyle={styles.actionLabel}
           >
-            New Quiz
+            NEW QUIZ
           </Button>
           <Button
             mode="contained"
-            onPress={startQuiz}
+            onPress={() => startQuiz()}
             style={styles.actionButton}
+            buttonColor={NEO.yellow}
+            textColor={NEO.ink}
+            labelStyle={styles.actionLabel}
           >
-            Try Again
+            TRY AGAIN
           </Button>
         </View>
       </ScrollView>
@@ -253,141 +310,260 @@ export default function QuizScreen() {
   );
 }
 
+const CategoryChip: React.FC<{
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  disabled?: boolean;
+  color?: string;
+}> = ({ label, selected, onPress, disabled, color }) => (
+  <Pressable onPress={onPress} disabled={disabled}>
+    <View
+      style={[
+        styles.chip,
+        {
+          backgroundColor: selected ? color || NEO.yellow : NEO.white,
+          opacity: disabled ? 0.4 : 1,
+        },
+      ]}
+    >
+      <Text style={styles.chipText}>{label}</Text>
+    </View>
+  </Pressable>
+);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   setupContainer: {
-    padding: 20,
+    padding: 16,
+    paddingBottom: 32,
   },
-  header: {
-    marginBottom: 24,
+  heroBanner: {
+    backgroundColor: NEO.yellow,
+    padding: 22,
+    marginBottom: 18,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
+  heroEyebrow: {
+    color: NEO.ink,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.6,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+  heroTitle: {
+    color: NEO.ink,
+    fontSize: 32,
+    fontWeight: '900',
+    letterSpacing: -1.2,
     marginTop: 4,
   },
+  heroSubtitle: {
+    color: NEO.ink,
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
   card: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: BRUTAL.radius,
+    padding: 18,
     marginBottom: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: NEO.white,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
+    fontSize: 13,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.2,
+    marginBottom: 14,
   },
   categoryChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW_SM,
+    marginRight: 3,
     marginBottom: 4,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 0.6,
   },
   countButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
   countButton: {
-    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW_SM,
+    marginRight: 3,
+    marginBottom: 4,
+  },
+  countText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: NEO.ink,
   },
   startButton: {
     marginTop: 8,
-    borderRadius: 12,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
   startButtonContent: {
-    paddingVertical: 8,
+    paddingVertical: 6,
+  },
+  startLabel: {
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1.4,
   },
   warningText: {
     textAlign: 'center',
-    color: '#F59E0B',
+    color: NEO.ink,
     marginTop: 12,
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   completedContainer: {
     padding: 20,
     alignItems: 'center',
   },
   resultIcon: {
-    marginTop: 40,
-    marginBottom: 24,
+    width: 120,
+    height: 120,
+    marginTop: 24,
+    marginBottom: 20,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   resultTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 24,
+    fontSize: 32,
+    fontWeight: '900',
+    color: NEO.ink,
+    marginBottom: 22,
+    letterSpacing: -1,
   },
   scoreCard: {
-    borderRadius: 20,
-    padding: 32,
+    padding: 28,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    marginBottom: 24,
-    width: '100%',
+    marginBottom: 22,
+    width: '95%',
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
   },
   scorePercentage: {
-    fontSize: 64,
-    fontWeight: '800',
-    color: '#6366F1',
+    fontSize: 80,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -3,
   },
   scoreDetail: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 8,
+    fontSize: 13,
+    color: NEO.ink,
+    marginTop: 4,
+    fontWeight: '900',
+    letterSpacing: 1.2,
   },
   summaryCard: {
-    borderRadius: 16,
-    padding: 20,
-    backgroundColor: '#FFFFFF',
-    width: '100%',
-    marginBottom: 24,
+    borderRadius: BRUTAL.radius,
+    padding: 18,
+    width: '95%',
+    marginBottom: 22,
+    backgroundColor: NEO.white,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
   },
   summaryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
+    fontSize: 13,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.2,
+    marginBottom: 14,
   },
   resultItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: NEO.ink,
+    gap: 10,
+  },
+  resultIconSmall: {
+    width: 26,
+    height: 26,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   resultItemText: {
-    marginLeft: 12,
     flex: 1,
   },
   resultTerm: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    fontWeight: '800',
+    color: NEO.ink,
   },
   resultCorrect: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: NEO.ink,
     marginTop: 2,
+    fontWeight: '700',
+    letterSpacing: 0.6,
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 12,
-    width: '100%',
+    gap: 10,
+    width: '95%',
   },
   actionButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW_SM,
+    marginRight: 3,
+    marginBottom: 4,
+  },
+  actionLabel: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   authPrompt: {
     flex: 1,
@@ -395,7 +571,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   authText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 14,
+    color: NEO.ink,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

@@ -8,7 +8,8 @@ export type WidgetType =
   | 'daily-goal'
   | 'due-cards'
   | 'category-spotlight'
-  | 'quick-quiz';
+  | 'quick-quiz'
+  | 'discover';
 
 export type WidgetSize = 'small' | 'medium' | 'large';
 
@@ -38,7 +39,7 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
     icon: 'lightbulb-on',
     defaultSize: 'large',
     supportedSizes: ['medium', 'large'],
-    accent: ['#6366F1', '#8B5CF6'],
+    accent: ['#FFE066', '#B07CFF'],
   },
   {
     type: 'streak',
@@ -47,7 +48,7 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
     icon: 'fire',
     defaultSize: 'small',
     supportedSizes: ['small', 'medium'],
-    accent: ['#F97316', '#EF4444'],
+    accent: ['#FF9F45', '#FF5C5C'],
   },
   {
     type: 'daily-goal',
@@ -56,7 +57,7 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
     icon: 'target',
     defaultSize: 'medium',
     supportedSizes: ['small', 'medium'],
-    accent: ['#10B981', '#059669'],
+    accent: ['#A6F068', '#5BE0E0'],
   },
   {
     type: 'due-cards',
@@ -65,7 +66,7 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
     icon: 'clock-alert-outline',
     defaultSize: 'small',
     supportedSizes: ['small', 'medium'],
-    accent: ['#EC4899', '#BE185D'],
+    accent: ['#FF6B9D', '#B07CFF'],
   },
   {
     type: 'category-spotlight',
@@ -74,7 +75,7 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
     icon: 'star-four-points',
     defaultSize: 'medium',
     supportedSizes: ['medium', 'large'],
-    accent: ['#0EA5E9', '#6366F1'],
+    accent: ['#5B9EFF', '#B07CFF'],
   },
   {
     type: 'quick-quiz',
@@ -83,12 +84,22 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
     icon: 'head-question',
     defaultSize: 'small',
     supportedSizes: ['small', 'medium'],
-    accent: ['#F59E0B', '#F97316'],
+    accent: ['#FFE066', '#FF9F45'],
+  },
+  {
+    type: 'discover',
+    title: 'Discover',
+    description: 'Random term, tap to shuffle. Highlights what is new this week.',
+    icon: 'shuffle-variant',
+    defaultSize: 'medium',
+    supportedSizes: ['medium', 'large'],
+    accent: ['#5BE0E0', '#5B9EFF'],
   },
 ];
 
 const defaultWidgets: WidgetConfig[] = [
   { id: 'w-wotd', type: 'word-of-the-day', size: 'large', enabled: true },
+  { id: 'w-discover', type: 'discover', size: 'medium', enabled: true },
   { id: 'w-streak', type: 'streak', size: 'small', enabled: true },
   { id: 'w-goal', type: 'daily-goal', size: 'small', enabled: true },
   { id: 'w-due', type: 'due-cards', size: 'small', enabled: false },
@@ -111,9 +122,7 @@ export const useWidgetStore = create<WidgetState>()(
 
       toggleWidget: (id: string) => {
         set((state) => ({
-          widgets: state.widgets.map((w) =>
-            w.id === id ? { ...w, enabled: !w.enabled } : w
-          ),
+          widgets: state.widgets.map((w) => (w.id === id ? { ...w, enabled: !w.enabled } : w)),
         }));
       },
 

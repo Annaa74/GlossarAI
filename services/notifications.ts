@@ -1,38 +1,64 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { NotificationSettings } from '../types';
 
-// Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// In Expo Go on SDK 53+, push notifications were removed and just *importing*
+// expo-notifications eagerly registers a push-token listener that throws.
+// Detect that environment and no-op every API call.
+const isExpoGo = Constants.appOwnership === 'expo';
+
+type Notif = typeof import('expo-notifications');
+
+let notifPromise: Promise<Notif | null> | null = null;
+const loadNotifications = (): Promise<Notif | null> => {
+  if (isExpoGo || Platform.OS === 'web') return Promise.resolve(null);
+  if (!notifPromise) {
+    notifPromise = import('expo-notifications')
+      .then(async (mod) => {
+        // Configure once on first load.
+        try {
+          await mod.setNotificationHandler({
+            handleNotification: async () => ({
+              shouldShowAlert: true,
+              shouldPlaySound: true,
+              shouldSetBadge: true,
+              shouldShowBanner: true,
+              shouldShowList: true,
+            }),
+          });
+        } catch (e) {
+          console.warn('[notifications] handler setup failed', e);
+        }
+        return mod;
+      })
+      .catch((e) => {
+        console.warn('[notifications] expo-notifications unavailable', e);
+        return null;
+      });
+  }
+  return notifPromise;
+};
 
 // Request notification permissions
 export const requestPermissions = async (): Promise<boolean> => {
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  const N = await loadNotifications();
+  if (!N) return false;
 
+  const { status: existingStatus } = await N.getPermissionsAsync();
   let finalStatus = existingStatus;
-
   if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
+    const { status } = await N.requestPermissionsAsync();
     finalStatus = status;
   }
-
   return finalStatus === 'granted';
 };
 
 // Get push notification token
 export const getPushToken = async (): Promise<string | null> => {
-  if (Platform.OS === 'web') return null;
-
+  const N = await loadNotifications();
+  if (!N) return null;
   try {
-    const token = await Notifications.getExpoPushTokenAsync({
+    const token = await N.getExpoPushTokenAsync({
       projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
     });
     return token.data;
@@ -44,17 +70,17 @@ export const getPushToken = async (): Promise<string | null> => {
 
 // Schedule daily study reminder
 export const scheduleDailyReminder = async (
-  time: string, // HH:mm format
+  time: string,
   enabled: boolean
 ): Promise<string | null> => {
-  // Cancel existing reminders first
-  await cancelAllReminders();
+  const N = await loadNotifications();
+  if (!N) return null;
 
+  await cancelAllReminders();
   if (!enabled) return null;
 
   const [hours, minutes] = time.split(':').map(Number);
-
-  const identifier = await Notifications.scheduleNotificationAsync({
+  return N.scheduleNotificationAsync({
     content: {
       title: 'Time to Study! 📚',
       body: 'Your vocabulary cards are waiting. Keep your streak going!',
@@ -62,118 +88,123 @@ export const scheduleDailyReminder = async (
       data: { type: 'daily_reminder' },
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      type: N.SchedulableTriggerInputTypes.DAILY,
       hour: hours,
       minute: minutes,
     },
   });
-
-  return identifier;
 };
 
 // Schedule streak warning notification
-export const scheduleStreakWarning = async (
-  currentStreak: number
-): Promise<string | null> => {
+export const scheduleStreakWarning = async (currentStreak: number): Promise<string | null> => {
   if (currentStreak < 3) return null;
+  const N = await loadNotifications();
+  if (!N) return null;
 
-  // Schedule for 8 PM if user hasn't studied
-  const identifier = await Notifications.scheduleNotificationAsync({
+  return N.scheduleNotificationAsync({
     content: {
       title: `Don't lose your ${currentStreak}-day streak! 🔥`,
-      body: 'You haven\'t studied today. Review a few cards to keep it going!',
+      body: "You haven't studied today. Review a few cards to keep it going!",
       sound: true,
       data: { type: 'streak_warning' },
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      type: N.SchedulableTriggerInputTypes.DAILY,
       hour: 20,
       minute: 0,
     },
   });
-
-  return identifier;
 };
 
 // Send immediate notification for new content
-export const notifyNewContent = async (
-  category: string,
-  termCount: number
-): Promise<void> => {
-  await Notifications.scheduleNotificationAsync({
+export const notifyNewContent = async (category: string, termCount: number): Promise<void> => {
+  const N = await loadNotifications();
+  if (!N) return;
+  await N.scheduleNotificationAsync({
     content: {
       title: 'New Vocabulary Added! ✨',
       body: `${termCount} new ${category} terms are ready to learn.`,
       sound: true,
       data: { type: 'new_content', category },
     },
-    trigger: null, // Immediate
+    trigger: null,
   });
 };
 
 // Send weekly progress summary
 export const scheduleWeeklyProgress = async (): Promise<string | null> => {
-  const identifier = await Notifications.scheduleNotificationAsync({
+  const N = await loadNotifications();
+  if (!N) return null;
+  return N.scheduleNotificationAsync({
     content: {
       title: 'Weekly Progress Summary 📊',
-      body: 'Check out how much you\'ve learned this week!',
+      body: "Check out how much you've learned this week!",
       sound: true,
       data: { type: 'weekly_summary' },
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-      weekday: 1, // Monday
+      type: N.SchedulableTriggerInputTypes.WEEKLY,
+      weekday: 1,
       hour: 10,
       minute: 0,
     },
   });
-
-  return identifier;
 };
 
-// Cancel all scheduled notifications
 export const cancelAllReminders = async (): Promise<void> => {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  const N = await loadNotifications();
+  if (!N) return;
+  await N.cancelAllScheduledNotificationsAsync();
 };
 
-// Cancel specific notification
 export const cancelReminder = async (identifier: string): Promise<void> => {
-  await Notifications.cancelScheduledNotificationAsync(identifier);
+  const N = await loadNotifications();
+  if (!N) return;
+  await N.cancelScheduledNotificationAsync(identifier);
 };
 
-// Update notification settings
-export const updateNotificationSettings = async (
-  settings: NotificationSettings
-): Promise<void> => {
+export const updateNotificationSettings = async (settings: NotificationSettings): Promise<void> => {
   if (!settings.enabled) {
     await cancelAllReminders();
     return;
   }
-
   await scheduleDailyReminder(settings.reminderTime, settings.enabled);
   await scheduleWeeklyProgress();
 };
 
-// Listen for notification interactions
+// A subscription stub that's safe to .remove() in Expo Go.
+const noopSubscription = { remove: () => {} } as { remove: () => void };
+
 export const addNotificationResponseListener = (
-  callback: (response: Notifications.NotificationResponse) => void
-): Notifications.EventSubscription => {
-  return Notifications.addNotificationResponseReceivedListener(callback);
+  callback: (response: any) => void
+): { remove: () => void } => {
+  if (isExpoGo || Platform.OS === 'web') return noopSubscription;
+  let sub: { remove: () => void } | null = null;
+  loadNotifications().then((N) => {
+    if (N) sub = N.addNotificationResponseReceivedListener(callback);
+  });
+  return { remove: () => sub?.remove() };
 };
 
-// Listen for received notifications
 export const addNotificationReceivedListener = (
-  callback: (notification: Notifications.Notification) => void
-): Notifications.EventSubscription => {
-  return Notifications.addNotificationReceivedListener(callback);
+  callback: (notification: any) => void
+): { remove: () => void } => {
+  if (isExpoGo || Platform.OS === 'web') return noopSubscription;
+  let sub: { remove: () => void } | null = null;
+  loadNotifications().then((N) => {
+    if (N) sub = N.addNotificationReceivedListener(callback);
+  });
+  return { remove: () => sub?.remove() };
 };
 
-// Get badge count
 export const getBadgeCount = async (): Promise<number> => {
-  return await Notifications.getBadgeCountAsync();
+  const N = await loadNotifications();
+  if (!N) return 0;
+  return N.getBadgeCountAsync();
 };
 
-// Set badge count
 export const setBadgeCount = async (count: number): Promise<void> => {
-  await Notifications.setBadgeCountAsync(count);
+  const N = await loadNotifications();
+  if (!N) return;
+  await N.setBadgeCountAsync(count);
 };

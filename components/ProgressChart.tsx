@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
-import { Text, Surface } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { PieChart, BarChart } from 'react-native-chart-kit';
 import { CategoryProgress } from '../types';
-import { CATEGORIES } from '../constants/categories';
+import { NEO, BRUTAL, BRUTAL_SHADOW, BRUTAL_SHADOW_SM } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -22,32 +22,30 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({
 }) => {
   const newCards = totalCards - knownCards - learningCards;
 
-  // Pie chart data for overall progress
   const pieData = [
     {
       name: 'Known',
       count: knownCards,
-      color: '#10B981',
-      legendFontColor: '#374151',
+      color: NEO.lime,
+      legendFontColor: NEO.ink,
       legendFontSize: 12,
     },
     {
       name: 'Learning',
       count: learningCards,
-      color: '#F59E0B',
-      legendFontColor: '#374151',
+      color: NEO.orange,
+      legendFontColor: NEO.ink,
       legendFontSize: 12,
     },
     {
       name: 'New',
       count: newCards,
-      color: '#E5E7EB',
-      legendFontColor: '#374151',
+      color: NEO.blue,
+      legendFontColor: NEO.ink,
       legendFontSize: 12,
     },
   ].filter((d) => d.count > 0);
 
-  // Bar chart data for category progress
   const barData = {
     labels: categoryProgress.slice(0, 6).map((p) => {
       const name = p.category.split('/')[0].split(' ')[0];
@@ -61,32 +59,25 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({
   };
 
   const chartConfig = {
-    backgroundColor: '#FFFFFF',
-    backgroundGradientFrom: '#FFFFFF',
-    backgroundGradientTo: '#FFFFFF',
+    backgroundGradientFrom: NEO.white,
+    backgroundGradientTo: NEO.white,
     decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-    style: {
-      borderRadius: 16,
-    },
-    propsForBackgroundLines: {
-      strokeDasharray: '',
-      stroke: '#E5E7EB',
-    },
+    color: () => NEO.ink,
+    labelColor: () => NEO.ink,
+    style: { borderRadius: BRUTAL.radius },
+    propsForBackgroundLines: { strokeDasharray: '', stroke: NEO.ink, strokeWidth: 1 },
   };
 
   const overallProgress = totalCards > 0 ? Math.round((knownCards / totalCards) * 100) : 0;
 
   return (
     <View style={styles.container}>
-      {/* Overall Progress Card */}
-      <Surface style={styles.overallCard} elevation={2}>
-        <Text style={styles.sectionTitle}>Overall Progress</Text>
+      <View style={styles.overallCard}>
+        <Text style={styles.sectionTitle}>OVERALL PROGRESS</Text>
         <View style={styles.overallStats}>
           <View style={styles.mainStat}>
             <Text style={styles.mainStatValue}>{overallProgress}%</Text>
-            <Text style={styles.mainStatLabel}>Mastered</Text>
+            <Text style={styles.mainStatLabel}>MASTERED</Text>
           </View>
           <View style={styles.pieContainer}>
             {pieData.length > 0 && (
@@ -110,16 +101,15 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({
             <View key={item.name} style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: item.color }]} />
               <Text style={styles.legendText}>
-                {item.name}: {item.count}
+                {item.name.toUpperCase()}: {item.count}
               </Text>
             </View>
           ))}
         </View>
-      </Surface>
+      </View>
 
-      {/* Category Progress Card */}
-      <Surface style={styles.categoryCard} elevation={2}>
-        <Text style={styles.sectionTitle}>Progress by Category</Text>
+      <View style={styles.categoryCard}>
+        <Text style={styles.sectionTitle}>PROGRESS BY CATEGORY</Text>
         {categoryProgress.length > 0 && (
           <BarChart
             data={barData}
@@ -133,26 +123,25 @@ export const ProgressChart: React.FC<ProgressChartProps> = ({
             yAxisLabel=""
           />
         )}
-      </Surface>
+      </View>
 
-      {/* Stats Grid */}
       <View style={styles.statsGrid}>
-        <Surface style={styles.statCard} elevation={1}>
+        <View style={[styles.statCard, { backgroundColor: NEO.white }]}>
           <Text style={styles.statValue}>{totalCards}</Text>
-          <Text style={styles.statLabel}>Total Terms</Text>
-        </Surface>
-        <Surface style={styles.statCard} elevation={1}>
-          <Text style={[styles.statValue, { color: '#10B981' }]}>{knownCards}</Text>
-          <Text style={styles.statLabel}>Mastered</Text>
-        </Surface>
-        <Surface style={styles.statCard} elevation={1}>
-          <Text style={[styles.statValue, { color: '#F59E0B' }]}>{learningCards}</Text>
-          <Text style={styles.statLabel}>Learning</Text>
-        </Surface>
-        <Surface style={styles.statCard} elevation={1}>
-          <Text style={[styles.statValue, { color: '#6B7280' }]}>{newCards}</Text>
-          <Text style={styles.statLabel}>New</Text>
-        </Surface>
+          <Text style={styles.statLabel}>TOTAL TERMS</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: NEO.lime }]}>
+          <Text style={styles.statValue}>{knownCards}</Text>
+          <Text style={styles.statLabel}>MASTERED</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: NEO.orange }]}>
+          <Text style={styles.statValue}>{learningCards}</Text>
+          <Text style={styles.statLabel}>LEARNING</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: NEO.blue }]}>
+          <Text style={styles.statValue}>{newCards}</Text>
+          <Text style={styles.statLabel}>NEW</Text>
+        </View>
       </View>
     </View>
   );
@@ -163,16 +152,21 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   overallCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.white,
+    boxShadow: BRUTAL_SHADOW,
+    padding: 18,
+    marginBottom: 18,
+    marginRight: 4,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
+    fontSize: 13,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.2,
+    marginBottom: 14,
   },
   overallStats: {
     flexDirection: 'row',
@@ -183,13 +177,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mainStatValue: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: '#6366F1',
+    fontSize: 56,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -2,
   },
   mainStatLabel: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 12,
+    color: NEO.ink,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   pieContainer: {
     flex: 1,
@@ -197,56 +194,73 @@ const styles = StyleSheet.create({
   },
   legend: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     flexWrap: 'wrap',
+    gap: 10,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    borderRadius: BRUTAL.radius,
   },
   legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderWidth: 1.5,
+    borderColor: NEO.ink,
     marginRight: 6,
   },
   legendText: {
-    fontSize: 13,
-    color: '#374151',
+    fontSize: 11,
+    color: NEO.ink,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   categoryCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.white,
+    boxShadow: BRUTAL_SHADOW,
+    padding: 18,
+    marginBottom: 18,
+    marginRight: 4,
   },
   barChart: {
-    borderRadius: 12,
+    borderRadius: BRUTAL.radius,
     marginLeft: -16,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -6,
+    gap: 10,
   },
   statCard: {
-    width: '48%',
-    marginHorizontal: '1%',
-    marginBottom: 12,
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: '#FFFFFF',
+    width: '47%',
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW_SM,
+    padding: 14,
     alignItems: 'center',
+    marginBottom: 4,
+    marginRight: 3,
   },
   statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: 30,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -1,
   },
   statLabel: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 4,
+    fontSize: 10,
+    color: NEO.ink,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginTop: 2,
   },
 });
 

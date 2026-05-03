@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Hard offset shadow block -->
+  <rect x="64" y="64" width="896" height="896" rx="48" fill="#000000"/>
+  <!-- Yellow surface offset up-and-left to expose the shadow -->
+  <rect x="32" y="32" width="896" height="896" rx="48" fill="#FFE066" stroke="#000000" stroke-width="40"/>
+  <!-- Pink accent slash (brutalist signature) -->
+  <rect x="640" y="120" width="80" height="780" fill="#FF6B9D" stroke="#000000" stroke-width="24" transform="rotate(15 680 510)"/>
+  <!-- Bold black G monogram, all caps, heavy weight -->
+  <text
+    x="48%"
+    y="60%"
+    text-anchor="middle"
+    font-family="Arial Black, Helvetica, sans-serif"
+    font-weight="900"
+    font-size="640"
+    fill="#000000"
+    letter-spacing="-32"
+  >G</text>
+  <!-- Bottom-right tag block -->
+  <rect x="720" y="780" width="180" height="120" fill="#A6F068" stroke="#000000" stroke-width="20" rx="12"/>
+  <text
+    x="810"
+    y="858"
+    text-anchor="middle"
+    font-family="Arial Black, Helvetica, sans-serif"
+    font-weight="900"
+    font-size="64"
+    fill="#000000"
+    letter-spacing="2"
+  >AI</text>
+</svg>

@@ -34,9 +34,7 @@ export const WidgetCarousel: React.FC<Props> = ({ widgets, onWidgetPress }) => {
           key={w.id}
           config={{ ...w, size: 'medium' }}
           style={styles.slot}
-          onPress={() =>
-            onWidgetPress ? onWidgetPress(w) : navigateForWidget(w.type)
-          }
+          onPress={() => (onWidgetPress ? onWidgetPress(w) : navigateForWidget(w.type))}
         />
       ))}
     </ScrollView>

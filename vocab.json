@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-03T00:00:00Z",
+  "_comment": "Layer 1 freshness manifest. Bump `version` when adding terms. Schema: services/vocabManifest.ts. The Layer 3 weekly GitHub Action appends candidates with approved=false; review and flip to approved=true before bumping version.",
+  "terms": []
+}

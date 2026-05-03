@@ -5,12 +5,7 @@ import { CategoryProgress, VocabCategory } from '../types';
 
 export const useProgress = () => {
   const { user } = useUserStore();
-  const {
-    vocabularies,
-    userProgress,
-    categoryProgress,
-    getCategoryProgress,
-  } = useVocabStore();
+  const { vocabularies, userProgress, categoryProgress, getCategoryProgress } = useVocabStore();
 
   // Fetch category progress on mount
   useEffect(() => {
@@ -49,9 +44,7 @@ export const useProgress = () => {
 
   // Get top categories by progress
   const topCategories = useMemo(() => {
-    return [...categoryProgress]
-      .sort((a, b) => b.percentMastered - a.percentMastered)
-      .slice(0, 3);
+    return [...categoryProgress].sort((a, b) => b.percentMastered - a.percentMastered).slice(0, 3);
   }, [categoryProgress]);
 
   // Get categories that need attention (low progress)

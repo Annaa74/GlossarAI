@@ -3,6 +3,7 @@
     "name": "GlosserAI",
     "slug": "GlosserAI",
     "version": "1.0.0",
+    "scheme": "glosserai",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -16,6 +17,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.glosserai.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -27,7 +29,27 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "WordOfTheDay",
+              "label": "GlosserAI · Word of the Day",
+              "description": "A fresh technical term every day, right on your home screen.",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "previewImage": "./assets/icon.png",
+              "updatePeriodMillis": 1800000,
+              "widgetFeatures": "reconfigurable"
+            }
+          ]
+        }
+      ]
     ]
   }
 }

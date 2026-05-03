@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Surface, Button, TextInput } from 'react-native-paper';
+import { Text, Button, TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { QuizQuestion as QuizQuestionType, Vocabulary } from '../types';
+import { NEO, BRUTAL, BRUTAL_SHADOW, BRUTAL_SHADOW_SM } from '../constants/theme';
 
 interface QuizQuestionProps {
   question: QuizQuestionType;
@@ -41,7 +42,6 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
 
     setHasSubmitted(true);
 
-    // Delay to show result before moving to next question
     setTimeout(() => {
       onAnswer(answer, isCorrect);
     }, 1500);
@@ -67,11 +67,11 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
     if (!hasSubmitted) return null;
 
     if (option === question.correctAnswer) {
-      return <MaterialCommunityIcons name="check-circle" size={24} color="#10B981" />;
+      return <MaterialCommunityIcons name="check-circle" size={22} color={NEO.ink} />;
     }
 
     if (option === selectedAnswer && option !== question.correctAnswer) {
-      return <MaterialCommunityIcons name="close-circle" size={24} color="#EF4444" />;
+      return <MaterialCommunityIcons name="close-circle" size={22} color={NEO.ink} />;
     }
 
     return null;
@@ -79,55 +79,48 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Progress */}
       <View style={styles.progress}>
         <Text style={styles.progressText}>
-          Question {questionNumber} of {totalQuestions}
+          QUESTION {questionNumber} OF {totalQuestions}
         </Text>
         <View style={styles.progressBar}>
           <View
-            style={[
-              styles.progressFill,
-              { width: `${(questionNumber / totalQuestions) * 100}%` },
-            ]}
+            style={[styles.progressFill, { width: `${(questionNumber / totalQuestions) * 100}%` }]}
           />
         </View>
       </View>
 
-      {/* Question Card */}
-      <Surface style={styles.questionCard} elevation={2}>
-        <Text style={styles.questionType}>
-          {question.type === 'multiple_choice' ? 'Multiple Choice' : 'Fill in the Blank'}
-        </Text>
+      <View style={styles.questionCard}>
+        <View style={styles.questionTypePill}>
+          <Text style={styles.questionType}>
+            {question.type === 'multiple_choice' ? 'MULTIPLE CHOICE' : 'FILL IN THE BLANK'}
+          </Text>
+        </View>
         <Text style={styles.question}>{question.question}</Text>
 
-        {/* Multiple Choice Options */}
         {question.type === 'multiple_choice' && question.options && (
           <View style={styles.options}>
             {question.options.map((option, index) => (
               <TouchableOpacity
                 key={index}
                 onPress={() => handleSelectOption(option)}
-                activeOpacity={0.7}
+                activeOpacity={0.85}
                 disabled={hasSubmitted}
               >
-                <Surface style={getOptionStyle(option)} elevation={1}>
+                <View style={getOptionStyle(option)}>
                   <View style={styles.optionContent}>
                     <View style={styles.optionLetter}>
-                      <Text style={styles.optionLetterText}>
-                        {String.fromCharCode(65 + index)}
-                      </Text>
+                      <Text style={styles.optionLetterText}>{String.fromCharCode(65 + index)}</Text>
                     </View>
                     <Text style={styles.optionText}>{option}</Text>
                     {getOptionIcon(option)}
                   </View>
-                </Surface>
+                </View>
               </TouchableOpacity>
             ))}
           </View>
         )}
 
-        {/* Fill in the Blank Input */}
         {question.type === 'fill_blank' && (
           <View style={styles.fillBlank}>
             <TextInput
@@ -137,30 +130,29 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
               onChangeText={setTextAnswer}
               disabled={hasSubmitted}
               style={styles.textInput}
+              outlineColor={NEO.ink}
+              activeOutlineColor={NEO.ink}
               autoCapitalize="none"
             />
             {hasSubmitted && (
               <View style={styles.answerFeedback}>
                 {textAnswer.toLowerCase() === question.correctAnswer.toLowerCase() ? (
                   <View style={styles.feedbackCorrect}>
-                    <MaterialCommunityIcons name="check-circle" size={20} color="#10B981" />
-                    <Text style={styles.feedbackText}>Correct!</Text>
+                    <MaterialCommunityIcons name="check-circle" size={20} color={NEO.ink} />
+                    <Text style={styles.feedbackText}>CORRECT!</Text>
                   </View>
                 ) : (
                   <View style={styles.feedbackIncorrect}>
-                    <MaterialCommunityIcons name="close-circle" size={20} color="#EF4444" />
-                    <Text style={styles.feedbackText}>
-                      Correct answer: {question.correctAnswer}
-                    </Text>
+                    <MaterialCommunityIcons name="close-circle" size={20} color={NEO.ink} />
+                    <Text style={styles.feedbackText}>ANSWER: {question.correctAnswer}</Text>
                   </View>
                 )}
               </View>
             )}
           </View>
         )}
-      </Surface>
+      </View>
 
-      {/* Submit Button */}
       {!hasSubmitted && (
         <Button
           mode="contained"
@@ -168,12 +160,24 @@ export const QuizQuestion: React.FC<QuizQuestionProps> = ({
           disabled={question.type === 'multiple_choice' ? !selectedAnswer : !textAnswer.trim()}
           style={styles.submitButton}
           contentStyle={styles.submitButtonContent}
+          buttonColor={NEO.yellow}
+          textColor={NEO.ink}
+          labelStyle={styles.submitLabel}
         >
-          Submit Answer
+          SUBMIT ANSWER
         </Button>
       )}
     </View>
   );
+};
+
+const baseOption = {
+  borderRadius: BRUTAL.radius,
+  padding: 14,
+  borderWidth: BRUTAL.border,
+  borderColor: NEO.ink,
+  boxShadow: BRUTAL_SHADOW_SM,
+  marginRight: 3,
 };
 
 const styles = StyleSheet.create({
@@ -182,102 +186,108 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   progress: {
-    marginBottom: 24,
+    marginBottom: 22,
   },
   progressText: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 12,
+    color: NEO.ink,
+    fontWeight: '900',
+    letterSpacing: 1.2,
     marginBottom: 8,
   },
   progressBar: {
-    height: 4,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 2,
+    height: 12,
+    backgroundColor: NEO.white,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#6366F1',
-    borderRadius: 2,
+    backgroundColor: NEO.lime,
   },
   questionCard: {
-    borderRadius: 16,
-    padding: 24,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BRUTAL.radius,
+    padding: 20,
+    backgroundColor: NEO.white,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
+  },
+  questionTypePill: {
+    alignSelf: 'flex-start',
+    backgroundColor: NEO.yellow,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    marginBottom: 14,
   },
   questionType: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6366F1',
-    textTransform: 'uppercase',
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
     letterSpacing: 1,
-    marginBottom: 12,
   },
   question: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    lineHeight: 28,
-    marginBottom: 24,
+    fontSize: 22,
+    fontWeight: '800',
+    color: NEO.ink,
+    lineHeight: 30,
+    marginBottom: 22,
+    letterSpacing: -0.5,
   },
   options: {
-    gap: 12,
+    gap: 10,
   },
   option: {
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 2,
-    borderColor: 'transparent',
+    ...baseOption,
+    backgroundColor: NEO.white,
   },
   selectedOption: {
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: '#EEF2FF',
-    borderWidth: 2,
-    borderColor: '#6366F1',
+    ...baseOption,
+    backgroundColor: NEO.yellow,
   },
   correctOption: {
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: '#ECFDF5',
-    borderWidth: 2,
-    borderColor: '#10B981',
+    ...baseOption,
+    backgroundColor: NEO.lime,
   },
   incorrectOption: {
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 2,
-    borderColor: '#EF4444',
+    ...baseOption,
+    backgroundColor: NEO.red,
   },
   optionContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   optionLetter: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#E5E7EB',
+    width: 30,
+    height: 30,
+    borderRadius: BRUTAL.radius,
+    backgroundColor: NEO.ink,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   optionLetterText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: '900',
+    color: NEO.white,
   },
   optionText: {
     flex: 1,
-    fontSize: 16,
-    color: '#374151',
+    fontSize: 15,
+    color: NEO.ink,
+    fontWeight: '700',
   },
   fillBlank: {
-    marginTop: 8,
+    marginTop: 4,
   },
   textInput: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: NEO.white,
   },
   answerFeedback: {
     marginTop: 12,
@@ -286,27 +296,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#ECFDF5',
-    borderRadius: 8,
+    backgroundColor: NEO.lime,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    gap: 8,
   },
   feedbackIncorrect: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 8,
+    backgroundColor: NEO.red,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    gap: 8,
   },
   feedbackText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#374151',
+    fontSize: 13,
+    color: NEO.ink,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
   submitButton: {
-    marginTop: 24,
-    borderRadius: 12,
+    marginTop: 22,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
   submitButtonContent: {
-    paddingVertical: 8,
+    paddingVertical: 6,
+  },
+  submitLabel: {
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });
 

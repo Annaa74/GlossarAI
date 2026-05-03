@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { Text, TextInput, Button, Surface, HelperText } from 'react-native-paper';
+import {
+  View,
+  StyleSheet,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { Text, TextInput, Button, HelperText } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useUserStore } from '../../stores/userStore';
+import { useGoogleAuth } from '../../hooks';
 import { isValidEmail, isValidPassword } from '../../utils/helpers';
+import { NEO, BRUTAL, BRUTAL_SHADOW } from '../../constants/theme';
 
 export default function SignupScreen() {
   const [displayName, setDisplayName] = useState('');
@@ -20,6 +29,7 @@ export default function SignupScreen() {
   }>({});
 
   const { signUp, isLoading, error, clearError } = useUserStore();
+  const { prompt: promptGoogle, ready: googleReady } = useGoogleAuth();
 
   const validate = (): boolean => {
     const newErrors: typeof errors = {};
@@ -58,7 +68,7 @@ export default function SignupScreen() {
       await signUp(email.trim(), password, displayName.trim());
       router.replace('/(tabs)');
     } catch (err) {
-      // Error is handled by the store
+      // Error handled by store
     }
   };
 
@@ -70,27 +80,27 @@ export default function SignupScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.content}>
-            {/* Header */}
             <View style={styles.header}>
               <Button
                 mode="text"
                 onPress={() => router.back()}
                 icon="close"
-                style={styles.closeButton}
+                textColor={NEO.ink}
+                labelStyle={styles.closeLabel}
               >
-                Close
+                CLOSE
               </Button>
             </View>
 
-            {/* Logo */}
             <View style={styles.logoContainer}>
-              <MaterialCommunityIcons name="book-open-page-variant" size={64} color="#6366F1" />
-              <Text style={styles.title}>Create Account</Text>
+              <View style={styles.logoBadge}>
+                <MaterialCommunityIcons name="book-open-page-variant" size={36} color={NEO.ink} />
+              </View>
+              <Text style={styles.title}>CREATE ACCOUNT</Text>
               <Text style={styles.subtitle}>Start your learning journey today</Text>
             </View>
 
-            {/* Form */}
-            <Surface style={styles.form} elevation={2}>
+            <View style={styles.form}>
               <TextInput
                 label="Full Name"
                 value={displayName}
@@ -103,6 +113,8 @@ export default function SignupScreen() {
                 autoComplete="name"
                 error={!!errors.displayName}
                 style={styles.input}
+                outlineColor={NEO.ink}
+                activeOutlineColor={NEO.ink}
                 left={<TextInput.Icon icon="account" />}
               />
               {errors.displayName && (
@@ -124,6 +136,8 @@ export default function SignupScreen() {
                 autoComplete="email"
                 error={!!errors.email}
                 style={styles.input}
+                outlineColor={NEO.ink}
+                activeOutlineColor={NEO.ink}
                 left={<TextInput.Icon icon="email" />}
               />
               {errors.email && (
@@ -143,6 +157,8 @@ export default function SignupScreen() {
                 secureTextEntry={!showPassword}
                 error={!!errors.password}
                 style={styles.input}
+                outlineColor={NEO.ink}
+                activeOutlineColor={NEO.ink}
                 left={<TextInput.Icon icon="lock" />}
                 right={
                   <TextInput.Icon
@@ -168,6 +184,8 @@ export default function SignupScreen() {
                 secureTextEntry={!showPassword}
                 error={!!errors.confirmPassword}
                 style={styles.input}
+                outlineColor={NEO.ink}
+                activeOutlineColor={NEO.ink}
                 left={<TextInput.Icon icon="lock-check" />}
               />
               {errors.confirmPassword && (
@@ -189,27 +207,50 @@ export default function SignupScreen() {
                 disabled={isLoading}
                 style={styles.signupButton}
                 contentStyle={styles.signupButtonContent}
+                buttonColor={NEO.pink}
+                textColor={NEO.ink}
+                labelStyle={styles.signupBtnLabel}
               >
-                Create Account
+                CREATE ACCOUNT
               </Button>
-            </Surface>
 
-            {/* Terms */}
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <Button
+                mode="contained"
+                onPress={() => promptGoogle()}
+                disabled={!googleReady || isLoading}
+                style={styles.googleButton}
+                contentStyle={styles.signupButtonContent}
+                buttonColor={NEO.white}
+                textColor={NEO.ink}
+                labelStyle={styles.googleLabel}
+                icon="google"
+              >
+                CONTINUE WITH GOOGLE
+              </Button>
+            </View>
+
             <Text style={styles.termsText}>
               By creating an account, you agree to our{' '}
               <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
               <Text style={styles.termsLink}>Privacy Policy</Text>
             </Text>
 
-            {/* Login Link */}
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>Already have an account? </Text>
               <Button
                 mode="text"
                 onPress={() => router.replace('/auth/login')}
                 compact
+                textColor={NEO.ink}
+                labelStyle={styles.loginLink}
               >
-                Sign In
+                SIGN IN
               </Button>
             </View>
           </View>
@@ -222,7 +263,7 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: NEO.cream,
   },
   keyboardView: {
     flex: 1,
@@ -238,53 +279,118 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
   },
-  closeButton: {
-    marginLeft: -8,
+  closeLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   logoContainer: {
     alignItems: 'center',
     marginTop: 8,
-    marginBottom: 24,
+    marginBottom: 22,
+  },
+  logoBadge: {
+    width: 76,
+    height: 76,
+    backgroundColor: NEO.pink,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+    marginRight: 4,
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 16,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -0.8,
+    marginTop: 10,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: NEO.ink,
     marginTop: 8,
+    fontWeight: '600',
   },
   form: {
-    borderRadius: 20,
-    padding: 24,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BRUTAL.radius,
+    padding: 22,
+    backgroundColor: NEO.white,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
   input: {
     marginBottom: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: NEO.white,
   },
   errorText: {
     marginBottom: 8,
   },
   signupButton: {
-    marginTop: 16,
-    borderRadius: 12,
+    marginTop: 14,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
   signupButtonContent: {
-    paddingVertical: 8,
+    paddingVertical: 6,
+  },
+  signupBtnLabel: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 4,
+    gap: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: NEO.ink,
+  },
+  dividerText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.4,
+  },
+  googleButton: {
+    marginTop: 12,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
+  },
+  googleLabel: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   termsText: {
     textAlign: 'center',
-    color: '#6B7280',
-    fontSize: 12,
+    color: NEO.ink,
+    fontSize: 11,
     marginTop: 16,
     paddingHorizontal: 20,
+    fontWeight: '600',
+    lineHeight: 16,
   },
   termsLink: {
-    color: '#6366F1',
+    color: NEO.ink,
+    fontWeight: '900',
+    textDecorationLine: 'underline',
   },
   loginContainer: {
     flexDirection: 'row',
@@ -293,6 +399,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   loginText: {
-    color: '#6B7280',
+    color: NEO.ink,
+    fontWeight: '600',
+  },
+  loginLink: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

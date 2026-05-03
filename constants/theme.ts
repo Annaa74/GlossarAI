@@ -1,68 +1,113 @@
-import { MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
+import { MD3LightTheme, MD3DarkTheme, useTheme } from 'react-native-paper';
+
+export const NEO = {
+  yellow: '#FFE066',
+  pink: '#FF6B9D',
+  lime: '#A6F068',
+  blue: '#5B9EFF',
+  orange: '#FF9F45',
+  purple: '#B07CFF',
+  red: '#FF5C5C',
+  cyan: '#5BE0E0',
+  cream: '#FFF8E7',
+  ink: '#000000',
+  inkSoft: '#1A1A1A',
+  inkMuted: '#4A4A4A',
+  white: '#FFFFFF',
+  paper: '#FAF6EC',
+};
+
+export const BRUTAL = {
+  border: 2,
+  borderThick: 3,
+  radius: 4,
+  shadowOffset: 4,
+  shadowOffsetSm: 3,
+  shadowOffsetLg: 6,
+};
+
+export const BRUTAL_SHADOW = '4px 4px 0 #000000';
+export const BRUTAL_SHADOW_SM = '3px 3px 0 #000000';
+export const BRUTAL_SHADOW_LG = '6px 6px 0 #000000';
+export const BRUTAL_SHADOW_PRESSED = '1px 1px 0 #000000';
 
 export const lightTheme = {
   ...MD3LightTheme,
   colors: {
     ...MD3LightTheme.colors,
-    primary: '#6366F1',
-    primaryContainer: '#E0E7FF',
-    secondary: '#8B5CF6',
-    secondaryContainer: '#EDE9FE',
-    tertiary: '#EC4899',
-    tertiaryContainer: '#FCE7F3',
-    surface: '#FFFFFF',
-    surfaceVariant: '#F3F4F6',
-    background: '#F9FAFB',
-    error: '#EF4444',
-    errorContainer: '#FEE2E2',
-    onPrimary: '#FFFFFF',
-    onSecondary: '#FFFFFF',
-    onTertiary: '#FFFFFF',
-    onSurface: '#111827',
-    onSurfaceVariant: '#6B7280',
-    onBackground: '#111827',
-    outline: '#D1D5DB',
-    outlineVariant: '#E5E7EB',
-    success: '#10B981',
-    warning: '#F59E0B',
+    primary: NEO.ink,
+    primaryContainer: NEO.yellow,
+    secondary: NEO.pink,
+    secondaryContainer: NEO.pink,
+    tertiary: NEO.lime,
+    tertiaryContainer: NEO.lime,
+    surface: NEO.white,
+    surfaceVariant: NEO.paper,
+    background: NEO.cream,
+    error: NEO.red,
+    errorContainer: NEO.red,
+    onPrimary: NEO.white,
+    onSecondary: NEO.ink,
+    onTertiary: NEO.ink,
+    onSurface: NEO.ink,
+    onSurfaceVariant: NEO.inkMuted,
+    onBackground: NEO.ink,
+    outline: NEO.ink,
+    outlineVariant: NEO.ink,
+    success: NEO.lime,
+    warning: NEO.orange,
   },
-  roundness: 12,
+  roundness: BRUTAL.radius,
 };
 
 export const darkTheme = {
   ...MD3DarkTheme,
   colors: {
     ...MD3DarkTheme.colors,
-    primary: '#818CF8',
-    primaryContainer: '#3730A3',
-    secondary: '#A78BFA',
-    secondaryContainer: '#5B21B6',
-    tertiary: '#F472B6',
-    tertiaryContainer: '#9D174D',
-    surface: '#1F2937',
-    surfaceVariant: '#374151',
-    background: '#111827',
-    error: '#F87171',
-    errorContainer: '#7F1D1D',
-    onPrimary: '#1E1B4B',
-    onSecondary: '#2E1065',
-    onTertiary: '#500724',
-    onSurface: '#F9FAFB',
-    onSurfaceVariant: '#9CA3AF',
-    onBackground: '#F9FAFB',
-    outline: '#4B5563',
-    outlineVariant: '#374151',
-    success: '#34D399',
-    warning: '#FBBF24',
+    primary: NEO.yellow,
+    primaryContainer: NEO.yellow,
+    secondary: NEO.pink,
+    secondaryContainer: NEO.pink,
+    tertiary: NEO.lime,
+    tertiaryContainer: NEO.lime,
+    surface: NEO.inkSoft,
+    surfaceVariant: '#2A2A2A',
+    background: NEO.ink,
+    error: NEO.red,
+    errorContainer: NEO.red,
+    onPrimary: NEO.ink,
+    onSecondary: NEO.ink,
+    onTertiary: NEO.ink,
+    onSurface: NEO.white,
+    onSurfaceVariant: '#CCCCCC',
+    onBackground: NEO.white,
+    outline: NEO.white,
+    outlineVariant: NEO.white,
+    success: NEO.lime,
+    warning: NEO.orange,
   },
-  roundness: 12,
+  roundness: BRUTAL.radius,
 };
 
 export const CARD_COLORS = {
-  known: '#10B981',
-  learning: '#F59E0B',
-  new: '#6366F1',
-  favorite: '#EC4899',
+  known: NEO.lime,
+  learning: NEO.orange,
+  new: NEO.blue,
+  favorite: NEO.pink,
+};
+
+export const useThemedColors = () => {
+  const t = useTheme();
+  return {
+    bg: t.colors.background,
+    surface: t.colors.surface,
+    surfaceVariant: t.colors.surfaceVariant,
+    text: t.colors.onBackground,
+    textMuted: t.colors.onSurfaceVariant,
+    border: t.colors.outline,
+    primary: t.colors.primary,
+    accent: NEO.yellow,
+  };
 };
 
 export const SPACING = {

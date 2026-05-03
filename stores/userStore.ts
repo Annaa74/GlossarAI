@@ -14,7 +14,10 @@ interface UserState {
   // Actions
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
+  signInWithGoogle: (idToken: string) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: (currentPassword: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   setUser: (user: User | null) => void;
   updateStreak: () => Promise<void>;
   clearError: () => void;
@@ -56,6 +59,20 @@ export const useUserStore = create<UserState>()(
         }
       },
 
+      signInWithGoogle: async (idToken: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const user = await authService.signInWithGoogleIdToken(idToken);
+          set({ user, isAuthenticated: true, isLoading: false });
+        } catch (error: any) {
+          set({
+            error: error.message || 'Google sign-in failed',
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
       signOut: async () => {
         set({ isLoading: true });
         try {
@@ -66,6 +83,39 @@ export const useUserStore = create<UserState>()(
             error: error.message || 'Failed to sign out',
             isLoading: false,
           });
+        }
+      },
+
+      deleteAccount: async (currentPassword: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const { user } = get();
+          // Guests have no Firebase record — just clear local state.
+          if (user?.id?.startsWith('guest-')) {
+            set({ user: null, isAuthenticated: false, isLoading: false });
+            return;
+          }
+          await authService.deleteAccount(currentPassword);
+          set({ user: null, isAuthenticated: false, isLoading: false });
+        } catch (error: any) {
+          const message =
+            error?.code === 'auth/wrong-password' || error?.code === 'auth/invalid-credential'
+              ? 'Incorrect password.'
+              : error?.code === 'auth/too-many-requests'
+                ? 'Too many attempts. Try again in a few minutes.'
+                : error?.message || 'Failed to delete account';
+          set({ error: message, isLoading: false });
+          throw error;
+        }
+      },
+
+      sendPasswordReset: async (email: string) => {
+        set({ error: null });
+        try {
+          await authService.sendPasswordReset(email);
+        } catch (error: any) {
+          set({ error: error.message || 'Failed to send reset email' });
+          throw error;
         }
       },
 
@@ -86,10 +136,12 @@ export const useUserStore = create<UserState>()(
 
         set({ user: updatedUser });
 
-        try {
-          await authService.updateStreak(user.id, newStreak);
-        } catch (error) {
-          console.error('Failed to update streak:', error);
+        if (!user.id.startsWith('guest-')) {
+          try {
+            await authService.updateStreak(user.id, newStreak);
+          } catch (error) {
+            console.error('Failed to update streak:', error);
+          }
         }
       },
 

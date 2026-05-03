@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is the request authenticated as the given uid?
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // User profile documents. Path: users/{uid}
+    // Mirrors the User shape in types/index.ts and what services/auth.ts writes.
+    match /users/{userId} {
+
+      // Read: only the owner can read their own profile.
+      allow read: if isOwner(userId);
+
+      // Create: only the owner can create their doc, and the doc must claim
+      // their own uid (prevents creating a doc for someone else's uid).
+      allow create: if isOwner(userId)
+        && request.resource.data.id == userId
+        && request.resource.data.email is string
+        && request.resource.data.displayName is string;
+
+      // Update: owner only. Identity fields are immutable; only profile/state
+      // fields may change.
+      allow update: if isOwner(userId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt
+        // Allowed mutable fields:
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['streak', 'lastStudyDate', 'displayName', 'notificationSettings']);
+
+      // Delete: owner only. Required by Apple App Store (Guideline 5.1.1(v))
+      // for any app with sign-up to support self-service account deletion.
+      // The client deletes the Firestore doc first, then calls deleteUser()
+      // on the Firebase Auth record — see services/auth.ts:deleteAccount.
+      allow delete: if isOwner(userId);
+    }
+
+    // Default deny everything else. Any new collection must be added explicitly
+    // above, with intentional rules — this protects against accidental writes
+    // to undocumented paths.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

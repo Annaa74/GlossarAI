@@ -1,251 +1,204 @@
-import React, { useState, useRef } from 'react';
-import {
-  View,
-  StyleSheet,
-  Dimensions,
-  TouchableWithoutFeedback,
-  Animated,
-} from 'react-native';
-import { Text, Chip, Surface } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React from 'react';
+import { View, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { Text } from 'react-native-paper';
 import { Vocabulary } from '../types';
 import { getCategoryColor, DIFFICULTY_LABELS, DIFFICULTY_COLORS } from '../constants/categories';
+import { NEO, BRUTAL, BRUTAL_SHADOW_LG } from '../constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - 40;
-const CARD_HEIGHT = 450;
+const CARD_WIDTH = SCREEN_WIDTH - 32;
+const CARD_HEIGHT_DEFAULT = 440;
 
 interface SwipeCardProps {
   vocab: Vocabulary;
-  onFlip?: () => void;
+  /** When provided (from a measured deck region), the card fills this exact height. */
+  height?: number;
 }
 
-export const SwipeCard: React.FC<SwipeCardProps> = ({ vocab, onFlip }) => {
-  const [isFlipped, setIsFlipped] = useState(false);
-  const flipAnimation = useRef(new Animated.Value(0)).current;
-
-  const handleFlip = () => {
-    const toValue = isFlipped ? 0 : 1;
-
-    Animated.spring(flipAnimation, {
-      toValue,
-      friction: 8,
-      tension: 10,
-      useNativeDriver: true,
-    }).start();
-
-    setIsFlipped(!isFlipped);
-    onFlip?.();
-  };
-
-  const frontInterpolate = flipAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '180deg'],
-  });
-
-  const backInterpolate = flipAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['180deg', '360deg'],
-  });
-
-  const frontAnimatedStyle = {
-    transform: [{ rotateY: frontInterpolate }],
-  };
-
-  const backAnimatedStyle = {
-    transform: [{ rotateY: backInterpolate }],
-  };
-
+const SwipeCardImpl: React.FC<SwipeCardProps> = ({ vocab, height }) => {
+  const CARD_HEIGHT = Math.max(280, height ?? CARD_HEIGHT_DEFAULT);
   const categoryColor = getCategoryColor(vocab.category);
+  const difficultyColor = DIFFICULTY_COLORS[vocab.difficulty];
 
   return (
-    <TouchableWithoutFeedback onPress={handleFlip}>
-      <View style={styles.container}>
-        {/* Front of card */}
-        <Animated.View style={[styles.card, styles.cardFront, frontAnimatedStyle]}>
-          <Surface style={styles.surface} elevation={4}>
-            <View style={[styles.categoryBadge, { backgroundColor: categoryColor }]}>
-              <Text style={styles.categoryText}>{vocab.category}</Text>
+    <View style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}>
+      <View style={styles.card}>
+        <View style={[styles.accentBar, { backgroundColor: categoryColor }]} />
+
+        <View style={styles.metaRow}>
+          <View style={[styles.categoryPill, { backgroundColor: categoryColor }]}>
+            <Text style={styles.categoryText}>{vocab.category}</Text>
+          </View>
+          <View style={[styles.difficultyPill, { backgroundColor: difficultyColor }]}>
+            <Text style={styles.difficultyText}>{DIFFICULTY_LABELS[vocab.difficulty]}</Text>
+          </View>
+        </View>
+
+        <View style={styles.termWrap}>
+          <Text style={styles.term} numberOfLines={2} adjustsFontSizeToFit>
+            {vocab.term}
+          </Text>
+        </View>
+
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>DEFINITION</Text>
+            <Text style={styles.definition}>{vocab.definition}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>EXAMPLE</Text>
+            <View style={[styles.exampleBox, { backgroundColor: categoryColor }]}>
+              <Text style={styles.example}>{vocab.example}</Text>
             </View>
+          </View>
 
-            <View style={styles.frontContent}>
-              <Text style={styles.term}>{vocab.term}</Text>
-
-              <View style={styles.tapHint}>
-                <MaterialCommunityIcons name="gesture-tap" size={24} color="#9CA3AF" />
-                <Text style={styles.tapHintText}>Tap to reveal definition</Text>
-              </View>
-            </View>
-
-            <View style={styles.footer}>
-              <Chip
-                mode="flat"
-                style={[
-                  styles.difficultyChip,
-                  { backgroundColor: DIFFICULTY_COLORS[vocab.difficulty] + '20' },
-                ]}
-                textStyle={{ color: DIFFICULTY_COLORS[vocab.difficulty], fontSize: 12 }}
-              >
-                {DIFFICULTY_LABELS[vocab.difficulty]}
-              </Chip>
-            </View>
-          </Surface>
-        </Animated.View>
-
-        {/* Back of card */}
-        <Animated.View style={[styles.card, styles.cardBack, backAnimatedStyle]}>
-          <Surface style={styles.surface} elevation={4}>
-            <View style={[styles.categoryBadge, { backgroundColor: categoryColor }]}>
-              <Text style={styles.categoryText}>{vocab.category}</Text>
-            </View>
-
-            <View style={styles.backContent}>
-              <Text style={styles.termSmall}>{vocab.term}</Text>
-
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Definition</Text>
-                <Text style={styles.definition}>{vocab.definition}</Text>
-              </View>
-
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Example</Text>
-                <Text style={styles.example}>"{vocab.example}"</Text>
-              </View>
-
-              {vocab.relatedTerms.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Related Terms</Text>
-                  <View style={styles.relatedTerms}>
-                    {vocab.relatedTerms.slice(0, 4).map((term, index) => (
-                      <Chip key={index} mode="outlined" style={styles.relatedChip} compact>
-                        {term}
-                      </Chip>
-                    ))}
+          {vocab.relatedTerms.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>RELATED</Text>
+              <View style={styles.relatedRow}>
+                {vocab.relatedTerms.slice(0, 4).map((t) => (
+                  <View key={t} style={styles.relatedChip}>
+                    <Text style={styles.relatedChipText}>{t}</Text>
                   </View>
-                </View>
-              )}
+                ))}
+              </View>
             </View>
-
-            <View style={styles.footer}>
-              <Text style={styles.tapBackHint}>Tap to flip back</Text>
-            </View>
-          </Surface>
-        </Animated.View>
+          )}
+        </ScrollView>
       </View>
-    </TouchableWithoutFeedback>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-  },
   card: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    backfaceVisibility: 'hidden',
-  },
-  cardFront: {},
-  cardBack: {},
-  surface: {
     flex: 1,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: NEO.white,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW_LG,
     overflow: 'hidden',
   },
-  categoryBadge: {
+  accentBar: {
+    height: 10,
+    width: '100%',
+    borderBottomWidth: BRUTAL.borderThick,
+    borderBottomColor: NEO.ink,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    alignSelf: 'center',
+    paddingTop: 10,
+    gap: 8,
+  },
+  categoryPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
   },
   categoryText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
-    letterSpacing: 1,
   },
-  frontContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+  difficultyPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+  },
+  difficultyText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  termWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
   term: {
     fontSize: 32,
-    fontWeight: '700',
-    textAlign: 'center',
-    color: '#111827',
-    marginBottom: 24,
-  },
-  tapHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    opacity: 0.6,
-  },
-  tapHintText: {
-    marginLeft: 8,
-    color: '#9CA3AF',
-    fontSize: 14,
-  },
-  backContent: {
-    flex: 1,
-    padding: 20,
-    paddingTop: 16,
-  },
-  termSmall: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  section: {
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -1,
+    lineHeight: 38,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
   },
-  definition: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#374151',
+  body: {
+    flex: 1,
   },
-  example: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#6B7280',
-    fontStyle: 'italic',
+  bodyContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    gap: 12,
   },
-  relatedTerms: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  relatedChip: {
-    marginRight: 4,
+  section: {},
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.6,
     marginBottom: 4,
   },
-  footer: {
-    padding: 16,
-    alignItems: 'center',
+  definition: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: NEO.ink,
+    fontWeight: '500',
+    textAlign: 'justify',
   },
-  difficultyChip: {
-    alignSelf: 'center',
+  exampleBox: {
+    padding: 10,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    borderRadius: BRUTAL.radius,
   },
-  tapBackHint: {
-    color: '#9CA3AF',
+  example: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: NEO.ink,
+    fontWeight: '600',
+    textAlign: 'justify',
+  },
+  relatedRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  relatedChip: {
+    backgroundColor: NEO.cream,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    borderRadius: BRUTAL.radius,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  relatedChipText: {
     fontSize: 12,
+    color: NEO.ink,
+    fontWeight: '700',
   },
 });
+
+export const SwipeCard = React.memo(
+  SwipeCardImpl,
+  (prev, next) => prev.vocab.id === next.vocab.id && prev.height === next.height
+);
 
 export default SwipeCard;

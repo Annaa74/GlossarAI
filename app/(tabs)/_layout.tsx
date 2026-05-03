@@ -1,73 +1,94 @@
 import { Tabs } from 'expo-router';
+import { View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme } from 'react-native-paper';
+import { NEO, BRUTAL } from '../../constants/theme';
+import { useUserStore } from '../../stores/userStore';
+
+const TabIcon = ({
+  name,
+  color,
+  focused,
+}: {
+  name: keyof typeof MaterialCommunityIcons.glyphMap;
+  color: string;
+  focused: boolean;
+}) => (
+  <View style={{ alignItems: 'center', justifyContent: 'center', height: 36 }}>
+    <MaterialCommunityIcons name={name} size={focused ? 28 : 26} color={color} />
+    <View
+      style={{
+        marginTop: 5,
+        width: focused ? 18 : 0,
+        height: 2,
+        backgroundColor: NEO.ink,
+      }}
+    />
+  </View>
+);
 
 export default function TabLayout() {
-  const theme = useTheme();
+  const isAuthenticated = useUserStore((s) => s.isAuthenticated);
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.outlineVariant,
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 65,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-          marginTop: 4,
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: NEO.ink,
+        tabBarInactiveTintColor: NEO.inkMuted,
+        tabBarStyle: isAuthenticated
+          ? {
+              backgroundColor: NEO.white,
+              borderTopWidth: BRUTAL.border,
+              borderTopColor: NEO.ink,
+              height: 68,
+              paddingTop: 6,
+              paddingBottom: 8,
+              elevation: 0,
+            }
+          : { display: 'none' },
+        tabBarItemStyle: {
+          paddingVertical: 4,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Learn',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cards" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="cards-outline" color={color} focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
         name="progress"
         options={{
-          title: 'Progress',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="chart-line" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="chart-line" color={color} focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
         name="quiz"
         options={{
-          title: 'Quiz',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="head-question" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="head-question-outline" color={color} focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
         name="widgets"
         options={{
-          title: 'Widgets',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="widgets" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="widgets-outline" color={color} focused={focused} />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="account-outline" color={color} focused={focused} />
           ),
         }}
       />

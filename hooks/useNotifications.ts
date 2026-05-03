@@ -27,27 +27,25 @@ export const useNotifications = () => {
 
   // Set up notification listeners
   useEffect(() => {
-    const responseSubscription = notificationService.addNotificationResponseListener(
-      (response) => {
-        const data = response.notification.request.content.data;
-        console.log('Notification tapped:', data);
+    const responseSubscription = notificationService.addNotificationResponseListener((response) => {
+      const data = response.notification.request.content.data;
+      console.log('Notification tapped:', data);
 
-        // Handle different notification types
-        switch (data?.type) {
-          case 'daily_reminder':
-            // Navigate to home screen
-            break;
-          case 'streak_warning':
-            // Navigate to home screen
-            break;
-          case 'weekly_summary':
-            // Navigate to progress screen
-            break;
-          default:
-            break;
-        }
+      // Handle different notification types
+      switch (data?.type) {
+        case 'daily_reminder':
+          // Navigate to home screen
+          break;
+        case 'streak_warning':
+          // Navigate to home screen
+          break;
+        case 'weekly_summary':
+          // Navigate to progress screen
+          break;
+        default:
+          break;
       }
-    );
+    });
 
     const receivedSubscription = notificationService.addNotificationReceivedListener(
       (notification) => {

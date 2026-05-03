@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Surface, ProgressBar } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CategoryProgress, VocabCategory } from '../types';
 import { getCategoryInfo } from '../constants/categories';
+import { NEO, BRUTAL, BRUTAL_SHADOW } from '../constants/theme';
 
 interface CategoryCardProps {
   progress: CategoryProgress;
@@ -12,122 +13,139 @@ interface CategoryCardProps {
 
 export const CategoryCard: React.FC<CategoryCardProps> = ({ progress, onPress }) => {
   const categoryInfo = getCategoryInfo(progress.category);
-  const progressValue = progress.percentMastered / 100;
+  const pct = Math.max(0, Math.min(100, progress.percentMastered));
 
   return (
-    <TouchableOpacity onPress={() => onPress(progress.category)} activeOpacity={0.7}>
-      <Surface style={styles.container} elevation={2}>
+    <TouchableOpacity onPress={() => onPress(progress.category)} activeOpacity={0.85}>
+      <View style={styles.container}>
         <View style={styles.header}>
-          <View style={[styles.iconContainer, { backgroundColor: categoryInfo.color + '20' }]}>
-            <MaterialCommunityIcons
-              name={categoryInfo.icon as any}
-              size={24}
-              color={categoryInfo.color}
-            />
+          <View style={[styles.iconContainer, { backgroundColor: categoryInfo.color }]}>
+            <MaterialCommunityIcons name={categoryInfo.icon as any} size={22} color={NEO.ink} />
           </View>
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{categoryInfo.name}</Text>
-            <Text style={styles.subtitle}>{progress.total} terms</Text>
+            <Text style={styles.subtitle}>{progress.total} TERMS</Text>
           </View>
-          <View style={styles.percentContainer}>
-            <Text style={[styles.percent, { color: categoryInfo.color }]}>
-              {progress.percentMastered}%
-            </Text>
+          <View style={[styles.percentContainer, { backgroundColor: categoryInfo.color }]}>
+            <Text style={styles.percent}>{pct}%</Text>
           </View>
         </View>
 
-        <View style={styles.progressContainer}>
-          <ProgressBar
-            progress={progressValue}
-            color={categoryInfo.color}
-            style={styles.progressBar}
+        <View style={styles.progressTrack}>
+          <View
+            style={[styles.progressFill, { width: `${pct}%`, backgroundColor: categoryInfo.color }]}
           />
         </View>
 
         <View style={styles.stats}>
-          <View style={styles.stat}>
-            <View style={[styles.statDot, { backgroundColor: '#10B981' }]} />
-            <Text style={styles.statText}>{progress.known} Known</Text>
+          <View style={[styles.statBlock, { backgroundColor: NEO.lime }]}>
+            <Text style={styles.statValue}>{progress.known}</Text>
+            <Text style={styles.statText}>KNOWN</Text>
           </View>
-          <View style={styles.stat}>
-            <View style={[styles.statDot, { backgroundColor: '#F59E0B' }]} />
-            <Text style={styles.statText}>{progress.learning} Learning</Text>
+          <View style={[styles.statBlock, { backgroundColor: NEO.orange }]}>
+            <Text style={styles.statValue}>{progress.learning}</Text>
+            <Text style={styles.statText}>LEARNING</Text>
           </View>
-          <View style={styles.stat}>
-            <View style={[styles.statDot, { backgroundColor: '#6B7280' }]} />
-            <Text style={styles.statText}>{progress.new} New</Text>
+          <View style={[styles.statBlock, { backgroundColor: NEO.cream }]}>
+            <Text style={styles.statValue}>{progress.new}</Text>
+            <Text style={styles.statText}>NEW</Text>
           </View>
         </View>
-      </Surface>
+      </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: NEO.white,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    padding: 14,
+    marginBottom: 14,
+    marginRight: 4,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
+    gap: 10,
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
     justifyContent: 'center',
     alignItems: 'center',
   },
   titleContainer: {
     flex: 1,
-    marginLeft: 12,
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#6B7280',
+    fontSize: 11,
+    color: NEO.ink,
+    fontWeight: '700',
+    letterSpacing: 0.8,
     marginTop: 2,
   },
   percentContainer: {
-    marginLeft: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
   },
   percent: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -0.5,
   },
-  progressContainer: {
+  progressTrack: {
+    height: 14,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.cream,
+    overflow: 'hidden',
     marginBottom: 12,
   },
-  progressBar: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#E5E7EB',
+  progressFill: {
+    height: '100%',
   },
   stats: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 6,
   },
-  stat: {
-    flexDirection: 'row',
+  statBlock: {
+    flex: 1,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    borderRadius: BRUTAL.radius,
+    paddingVertical: 6,
     alignItems: 'center',
   },
-  statDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+  statValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: NEO.ink,
   },
   statText: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 9,
+    color: NEO.ink,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    marginTop: 1,
   },
 });
 

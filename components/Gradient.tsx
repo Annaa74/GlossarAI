@@ -26,20 +26,9 @@ export const Gradient: React.FC<GradientProps> = ({
 
   return (
     <View style={[styles.container, style, { borderRadius, overflow: 'hidden' }]}>
-      <Svg
-        style={StyleSheet.absoluteFill}
-        width="100%"
-        height="100%"
-        preserveAspectRatio="none"
-      >
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
         <Defs>
-          <SvgLinearGradient
-            id={gradientId}
-            x1={start.x}
-            y1={start.y}
-            x2={end.x}
-            y2={end.y}
-          >
+          <SvgLinearGradient id={gradientId} x1={start.x} y1={start.y} x2={end.x} y2={end.y}>
             {colors.map((color, i) => (
               <Stop
                 key={i}

@@ -1,19 +1,17 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, ScrollView, SafeAreaView, RefreshControl } from 'react-native';
-import { Text, Surface } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { router } from 'expo-router';
-import { CategoryCard, ProgressChart, StreakBadge, Gradient } from '../../components';
+import { CategoryCard, ProgressChart, StreakBadge } from '../../components';
+import { useThemedColors, NEO, BRUTAL, BRUTAL_SHADOW } from '../../constants/theme';
 import { useProgress } from '../../hooks';
 import { useUserStore } from '../../stores/userStore';
 import { VocabCategory } from '../../types';
 
 export default function ProgressScreen() {
   const { user, isAuthenticated } = useUserStore();
-  const {
-    overallStats,
-    categoryProgress,
-    refreshProgress,
-  } = useProgress();
+  const c = useThemedColors();
+  const { overallStats, categoryProgress, refreshProgress } = useProgress();
 
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -24,7 +22,6 @@ export default function ProgressScreen() {
   };
 
   const handleCategoryPress = (category: VocabCategory) => {
-    // Navigate to category detail or filter home screen
     router.push({
       pathname: '/(tabs)',
       params: { category },
@@ -33,45 +30,34 @@ export default function ProgressScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
         <View style={styles.authPrompt}>
-          <Text style={styles.authText}>Sign in to track your progress</Text>
+          <Text style={styles.authText}>SIGN IN TO TRACK YOUR PROGRESS</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* Hero header */}
-        <Gradient
-          colors={['#6366F1', '#8B5CF6']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroBanner}
-          borderRadius={24}
-        >
+        <View style={styles.heroBanner}>
           <Text style={styles.heroEyebrow}>YOUR JOURNEY</Text>
-          <Text style={styles.heroTitle}>Progress</Text>
+          <Text style={styles.heroTitle}>PROGRESS</Text>
           <Text style={styles.heroSubtitle}>
-            {overallStats.percentMastered}% mastered · {overallStats.totalCards} terms total
+            {overallStats.percentMastered}% MASTERED · {overallStats.totalCards} TERMS
           </Text>
-        </Gradient>
+        </View>
 
-        {/* Streak Card */}
         {user && user.streak > 0 && (
           <View style={styles.streakContainer}>
             <StreakBadge streak={user.streak} size="large" />
           </View>
         )}
 
-        {/* Progress Charts */}
         <ProgressChart
           categoryProgress={categoryProgress}
           totalCards={overallStats.totalCards}
@@ -79,9 +65,8 @@ export default function ProgressScreen() {
           learningCards={overallStats.learningCards}
         />
 
-        {/* Category Progress Cards */}
         <View style={styles.categoriesSection}>
-          <Text style={styles.sectionTitle}>Progress by Category</Text>
+          <Text style={styles.sectionTitle}>BY CATEGORY</Text>
           {categoryProgress.map((progress) => (
             <CategoryCard
               key={progress.category}
@@ -91,28 +76,23 @@ export default function ProgressScreen() {
           ))}
         </View>
 
-        {/* Study Tips */}
-        <Surface style={styles.tipsCard} elevation={2}>
-          <Text style={styles.tipsTitle}>Study Tips</Text>
+        <View style={styles.tipsCard}>
+          <Text style={styles.tipsTitle}>STUDY TIPS</Text>
           <View style={styles.tip}>
-            <Text style={styles.tipBullet}>•</Text>
+            <View style={styles.tipBullet} />
             <Text style={styles.tipText}>
-              Review cards daily to maintain your streak and improve retention
+              Review cards daily to maintain your streak and improve retention.
             </Text>
           </View>
           <View style={styles.tip}>
-            <Text style={styles.tipBullet}>•</Text>
-            <Text style={styles.tipText}>
-              Focus on categories with lower progress percentages
-            </Text>
+            <View style={styles.tipBullet} />
+            <Text style={styles.tipText}>Focus on categories with lower progress percentages.</Text>
           </View>
           <View style={styles.tip}>
-            <Text style={styles.tipBullet}>•</Text>
-            <Text style={styles.tipText}>
-              Take quizzes to reinforce your learning
-            </Text>
+            <View style={styles.tipBullet} />
+            <Text style={styles.tipText}>Take quizzes to reinforce your learning.</Text>
           </View>
-        </Surface>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -121,75 +101,93 @@ export default function ProgressScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   scrollContent: {
     paddingBottom: 24,
   },
   heroBanner: {
+    backgroundColor: NEO.pink,
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 8,
-    padding: 24,
+    padding: 22,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 20,
   },
   heroEyebrow: {
-    color: 'rgba(255,255,255,0.85)',
+    color: NEO.ink,
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.4,
+    fontWeight: '900',
+    letterSpacing: 1.6,
   },
   heroTitle: {
-    color: '#FFFFFF',
-    fontSize: 32,
+    color: NEO.ink,
+    fontSize: 40,
     fontWeight: '900',
-    letterSpacing: -0.5,
+    letterSpacing: -1.5,
     marginTop: 4,
   },
   heroSubtitle: {
-    color: 'rgba(255,255,255,0.92)',
-    fontSize: 14,
+    color: NEO.ink,
+    fontSize: 12,
     marginTop: 6,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   streakContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
   },
   categoriesSection: {
     paddingHorizontal: 16,
     marginTop: 8,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
+    fontSize: 14,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.4,
+    marginBottom: 14,
   },
   tipsCard: {
     margin: 16,
-    padding: 20,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    padding: 18,
+    borderRadius: BRUTAL.radius,
+    backgroundColor: NEO.cream,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 20,
   },
   tipsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
+    fontSize: 14,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.2,
+    marginBottom: 14,
   },
   tip: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 10,
+    alignItems: 'flex-start',
   },
   tipBullet: {
-    color: '#6366F1',
-    fontSize: 16,
-    marginRight: 8,
+    width: 8,
+    height: 8,
+    backgroundColor: NEO.ink,
+    marginRight: 10,
+    marginTop: 5,
   },
   tipText: {
     flex: 1,
     fontSize: 14,
-    color: '#4B5563',
+    color: NEO.ink,
     lineHeight: 20,
+    fontWeight: '600',
   },
   authPrompt: {
     flex: 1,
@@ -197,7 +195,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   authText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 14,
+    color: NEO.ink,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

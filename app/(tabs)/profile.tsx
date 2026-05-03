@@ -1,48 +1,55 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, SafeAreaView, Alert } from 'react-native';
-import {
-  Text,
-  Surface,
-  Button,
-  Switch,
-  Divider,
-  List,
-  Avatar,
-  Portal,
-  Dialog,
-  TextInput,
-} from 'react-native-paper';
+import { View, StyleSheet, ScrollView, SafeAreaView, Alert, Pressable } from 'react-native';
+import { Text, Button, Switch, Avatar, Portal, Dialog, TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { StreakBadge, Gradient } from '../../components';
+import { StreakBadge } from '../../components';
+import {
+  useThemedColors,
+  NEO,
+  BRUTAL,
+  BRUTAL_SHADOW,
+  BRUTAL_SHADOW_SM,
+} from '../../constants/theme';
 import { useUserStore } from '../../stores/userStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useNotifications } from '../../hooks';
 
 export default function ProfileScreen() {
-  const { user, isAuthenticated, signOut } = useUserStore();
-  const { settings, notificationSettings, updateTheme, toggleSound, toggleHaptic, updateNotificationSettings } = useSettingsStore();
+  const { user, isAuthenticated, signOut, deleteAccount } = useUserStore();
+  const c = useThemedColors();
+  const {
+    settings,
+    notificationSettings,
+    updateTheme,
+    toggleSound,
+    toggleHaptic,
+    updateNotificationSettings,
+  } = useSettingsStore();
   const { hasPermission, toggleNotifications } = useNotifications();
 
   const [showTimeDialog, setShowTimeDialog] = useState(false);
   const [reminderTime, setReminderTime] = useState(notificationSettings.reminderTime);
 
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isGuest = !!user?.id?.startsWith('guest-');
+
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            await signOut();
-            router.replace('/');
-          },
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          await signOut();
+          router.replace('/');
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleUpdateReminderTime = async () => {
@@ -50,26 +57,60 @@ export default function ProfileScreen() {
     setShowTimeDialog(false);
   };
 
+  const openDeleteDialog = () => {
+    setDeletePassword('');
+    setDeleteError(null);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!isGuest && deletePassword.length === 0) {
+      setDeleteError('Enter your current password to confirm.');
+      return;
+    }
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount(deletePassword);
+      setShowDeleteDialog(false);
+      router.replace('/');
+    } catch (err: any) {
+      setDeleteError(useUserStore.getState().error ?? 'Failed to delete account.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
         <View style={styles.authPrompt}>
-          <MaterialCommunityIcons name="account-circle" size={80} color="#9CA3AF" />
-          <Text style={styles.authTitle}>Welcome to GlosserAI</Text>
-          <Text style={styles.authSubtitle}>Sign in to track your progress and sync across devices</Text>
+          <View style={styles.authIconWrap}>
+            <MaterialCommunityIcons name="account-circle" size={56} color={NEO.ink} />
+          </View>
+          <Text style={styles.authTitle}>WELCOME TO GLOSSERAI</Text>
+          <Text style={styles.authSubtitle}>
+            Sign in to track your progress and sync across devices.
+          </Text>
           <Button
             mode="contained"
             onPress={() => router.push('/auth/login')}
             style={styles.authButton}
+            buttonColor={NEO.ink}
+            textColor={NEO.white}
+            labelStyle={styles.authBtnLabel}
           >
-            Sign In
+            SIGN IN
           </Button>
           <Button
-            mode="outlined"
+            mode="contained"
             onPress={() => router.push('/auth/signup')}
             style={styles.authButtonOutlined}
+            buttonColor={NEO.lime}
+            textColor={NEO.ink}
+            labelStyle={styles.authBtnLabel}
           >
-            Create Account
+            CREATE ACCOUNT
           </Button>
         </View>
       </SafeAreaView>
@@ -77,84 +118,76 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Header */}
-        <View style={styles.profileWrap}>
-          <Gradient
-            colors={['#6366F1', '#EC4899']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.profileBanner}
-            borderRadius={24}
+        <View style={styles.profileCard}>
+          <Avatar.Text
+            size={80}
+            label={user?.displayName?.slice(0, 2).toUpperCase() || 'U'}
+            style={styles.avatar}
+            color={NEO.ink}
+            labelStyle={{ fontWeight: '900', fontSize: 28 }}
           />
-          <Surface style={styles.profileCard} elevation={2}>
-            <Avatar.Text
-              size={80}
-              label={user?.displayName?.slice(0, 2).toUpperCase() || 'U'}
-              style={styles.avatar}
-            />
-            <Text style={styles.displayName}>{user?.displayName}</Text>
-            <Text style={styles.email}>{user?.email}</Text>
-            {user && user.streak > 0 && (
-              <View style={styles.streakContainer}>
-                <StreakBadge streak={user.streak} size="medium" />
-              </View>
-            )}
-          </Surface>
+          <Text style={styles.displayName}>{user?.displayName?.toUpperCase()}</Text>
+          <Text style={styles.email}>{user?.email}</Text>
+          {user && user.streak > 0 && (
+            <View style={styles.streakContainer}>
+              <StreakBadge streak={user.streak} size="medium" />
+            </View>
+          )}
         </View>
 
-        {/* Study Stats */}
-        <Surface style={styles.statsCard} elevation={2}>
-          <Text style={styles.sectionTitle}>Study Stats</Text>
+        <View style={styles.statsCard}>
+          <Text style={styles.sectionTitle}>STUDY STATS</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{user?.streak || 0}</Text>
-              <Text style={styles.statLabel}>Day Streak</Text>
+              <Text style={styles.statLabel}>DAY STREAK</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
                 {user?.lastStudyDate
-                  ? new Date(user.lastStudyDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  : '-'}
+                  ? new Date(user.lastStudyDate).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })
+                  : '—'}
               </Text>
-              <Text style={styles.statLabel}>Last Study</Text>
+              <Text style={styles.statLabel}>LAST STUDY</Text>
             </View>
           </View>
-        </Surface>
+        </View>
 
-        {/* Notifications */}
-        <Surface style={styles.settingsCard} elevation={2}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          <List.Item
+        <View style={styles.settingsCard}>
+          <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
+          <SettingRow
+            icon="bell"
             title="Daily Reminders"
-            description={hasPermission ? 'Enabled' : 'Permission required'}
-            left={(props) => <List.Icon {...props} icon="bell" />}
-            right={() => (
+            subtitle={hasPermission ? 'ENABLED' : 'PERMISSION REQUIRED'}
+            right={
               <Switch
                 value={notificationSettings.enabled && hasPermission}
                 onValueChange={toggleNotifications}
+                color={NEO.ink}
               />
-            )}
+            }
           />
-          <Divider />
-          <List.Item
+          <SettingRow
+            icon="clock-outline"
             title="Reminder Time"
-            description={notificationSettings.reminderTime}
-            left={(props) => <List.Icon {...props} icon="clock-outline" />}
+            subtitle={notificationSettings.reminderTime}
             onPress={() => setShowTimeDialog(true)}
             disabled={!notificationSettings.enabled}
           />
-        </Surface>
+        </View>
 
-        {/* App Settings */}
-        <Surface style={styles.settingsCard} elevation={2}>
-          <Text style={styles.sectionTitle}>App Settings</Text>
-          <List.Item
+        <View style={styles.settingsCard}>
+          <Text style={styles.sectionTitle}>APP SETTINGS</Text>
+          <SettingRow
+            icon="theme-light-dark"
             title="Theme"
-            description={settings.theme.charAt(0).toUpperCase() + settings.theme.slice(1)}
-            left={(props) => <List.Icon {...props} icon="theme-light-dark" />}
+            subtitle={settings.theme.toUpperCase()}
             onPress={() => {
               const themes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system'];
               const currentIndex = themes.indexOf(settings.theme);
@@ -162,60 +195,52 @@ export default function ProfileScreen() {
               updateTheme(nextTheme);
             }}
           />
-          <Divider />
-          <List.Item
+          <SettingRow
+            icon="volume-high"
             title="Sound Effects"
-            left={(props) => <List.Icon {...props} icon="volume-high" />}
-            right={() => (
-              <Switch value={settings.soundEnabled} onValueChange={toggleSound} />
-            )}
+            right={
+              <Switch value={settings.soundEnabled} onValueChange={toggleSound} color={NEO.ink} />
+            }
           />
-          <Divider />
-          <List.Item
+          <SettingRow
+            icon="vibrate"
             title="Haptic Feedback"
-            left={(props) => <List.Icon {...props} icon="vibrate" />}
-            right={() => (
-              <Switch value={settings.hapticEnabled} onValueChange={toggleHaptic} />
-            )}
+            right={
+              <Switch value={settings.hapticEnabled} onValueChange={toggleHaptic} color={NEO.ink} />
+            }
           />
-        </Surface>
+        </View>
 
-        {/* About */}
-        <Surface style={styles.settingsCard} elevation={2}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <List.Item
-            title="Version"
-            description="1.0.0"
-            left={(props) => <List.Icon {...props} icon="information" />}
-          />
-          <Divider />
-          <List.Item
-            title="Privacy Policy"
-            left={(props) => <List.Icon {...props} icon="shield-check" />}
-            right={(props) => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => {}}
-          />
-          <Divider />
-          <List.Item
-            title="Terms of Service"
-            left={(props) => <List.Icon {...props} icon="file-document" />}
-            right={(props) => <List.Icon {...props} icon="chevron-right" />}
-            onPress={() => {}}
-          />
-        </Surface>
+        <View style={styles.settingsCard}>
+          <Text style={styles.sectionTitle}>ABOUT</Text>
+          <SettingRow icon="information" title="Version" subtitle="1.0.0" />
+          <SettingRow icon="shield-check" title="Privacy Policy" onPress={() => {}} chevron />
+          <SettingRow icon="file-document" title="Terms of Service" onPress={() => {}} chevron />
+        </View>
 
-        {/* Sign Out */}
         <Button
-          mode="outlined"
+          mode="contained"
           onPress={handleSignOut}
           style={styles.signOutButton}
-          textColor="#EF4444"
+          buttonColor={NEO.red}
+          textColor={NEO.ink}
+          labelStyle={styles.signOutLabel}
         >
-          Sign Out
+          SIGN OUT
+        </Button>
+
+        <Button
+          mode="text"
+          onPress={openDeleteDialog}
+          style={styles.deleteAccountButton}
+          textColor={NEO.ink}
+          labelStyle={styles.deleteAccountLabel}
+          icon="trash-can-outline"
+        >
+          DELETE ACCOUNT
         </Button>
       </ScrollView>
 
-      {/* Time Picker Dialog */}
       <Portal>
         <Dialog visible={showTimeDialog} onDismiss={() => setShowTimeDialog(false)}>
           <Dialog.Title>Set Reminder Time</Dialog.Title>
@@ -226,11 +251,68 @@ export default function ProfileScreen() {
               onChangeText={setReminderTime}
               placeholder="09:00"
               mode="outlined"
+              outlineColor={NEO.ink}
+              activeOutlineColor={NEO.ink}
             />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setShowTimeDialog(false)}>Cancel</Button>
-            <Button onPress={handleUpdateReminderTime}>Save</Button>
+            <Button onPress={() => setShowTimeDialog(false)} textColor={NEO.ink}>
+              Cancel
+            </Button>
+            <Button onPress={handleUpdateReminderTime} textColor={NEO.ink}>
+              Save
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog
+          visible={showDeleteDialog}
+          onDismiss={() => !isDeleting && setShowDeleteDialog(false)}
+        >
+          <Dialog.Title>Delete account?</Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ color: NEO.ink, marginBottom: 12 }}>
+              {isGuest
+                ? 'This clears your guest profile and all local progress on this device. It cannot be undone.'
+                : 'This permanently deletes your account, profile, and all cloud data. This cannot be undone.'}
+            </Text>
+            {!isGuest && (
+              <TextInput
+                label="Current password"
+                value={deletePassword}
+                onChangeText={(t) => {
+                  setDeletePassword(t);
+                  setDeleteError(null);
+                }}
+                mode="outlined"
+                secureTextEntry
+                autoCapitalize="none"
+                outlineColor={NEO.ink}
+                activeOutlineColor={NEO.ink}
+              />
+            )}
+            {deleteError && (
+              <Text style={{ color: NEO.red, marginTop: 10, fontWeight: '700' }}>
+                {deleteError}
+              </Text>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              onPress={() => setShowDeleteDialog(false)}
+              textColor={NEO.ink}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onPress={handleDeleteAccount}
+              textColor={NEO.red}
+              loading={isDeleting}
+              disabled={isDeleting}
+            >
+              Delete
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -238,59 +320,96 @@ export default function ProfileScreen() {
   );
 }
 
+const SettingRow: React.FC<{
+  icon: string;
+  title: string;
+  subtitle?: string;
+  right?: React.ReactNode;
+  onPress?: () => void;
+  disabled?: boolean;
+  chevron?: boolean;
+}> = ({ icon, title, subtitle, right, onPress, disabled, chevron }) => {
+  const content = (
+    <View style={[styles.row, disabled && { opacity: 0.4 }]}>
+      <View style={styles.rowIcon}>
+        <MaterialCommunityIcons name={icon as any} size={20} color={NEO.ink} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        {subtitle && <Text style={styles.rowSubtitle}>{subtitle}</Text>}
+      </View>
+      {right}
+      {chevron && <MaterialCommunityIcons name="chevron-right" size={22} color={NEO.ink} />}
+    </View>
+  );
+
+  if (onPress && !disabled) {
+    return (
+      <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+        {content}
+      </Pressable>
+    );
+  }
+  return content;
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   scrollContent: {
     padding: 16,
     paddingBottom: 32,
   },
-  profileWrap: {
-    marginBottom: 16,
-  },
-  profileBanner: {
-    height: 80,
-    marginBottom: -56,
-  },
   profileCard: {
-    borderRadius: 20,
-    padding: 24,
-    paddingTop: 16,
+    borderRadius: BRUTAL.radius,
+    padding: 22,
+    paddingTop: 20,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: NEO.yellow,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginBottom: 16,
+    marginRight: 4,
   },
   avatar: {
-    backgroundColor: '#6366F1',
-    marginBottom: 16,
+    backgroundColor: NEO.lime,
+    marginBottom: 14,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
   },
   displayName: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -0.5,
   },
   email: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: NEO.ink,
     marginTop: 4,
+    fontWeight: '600',
   },
   streakContainer: {
     marginTop: 16,
   },
   statsCard: {
-    borderRadius: 16,
-    padding: 20,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BRUTAL.radius,
+    padding: 18,
     marginBottom: 16,
+    backgroundColor: NEO.white,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
+    fontSize: 12,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.4,
+    marginBottom: 14,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -299,61 +418,144 @@ const styles = StyleSheet.create({
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
   },
   statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: 30,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -1,
   },
   statLabel: {
-    fontSize: 13,
-    color: '#6B7280',
+    fontSize: 10,
+    color: NEO.ink,
     marginTop: 4,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   statDivider: {
-    width: 1,
+    width: BRUTAL.border,
     height: 40,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: NEO.ink,
   },
   settingsCard: {
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BRUTAL.radius,
     marginBottom: 16,
-    overflow: 'hidden',
-    paddingTop: 16,
-    paddingHorizontal: 4,
+    backgroundColor: NEO.white,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    padding: 14,
+    marginRight: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: NEO.ink,
+  },
+  rowIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.cream,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: NEO.ink,
+  },
+  rowSubtitle: {
+    fontSize: 11,
+    color: NEO.ink,
+    marginTop: 2,
+    fontWeight: '700',
+    letterSpacing: 0.6,
   },
   signOutButton: {
     marginTop: 8,
-    borderColor: '#EF4444',
-    borderRadius: 12,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
+  },
+  signOutLabel: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  deleteAccountButton: {
+    marginTop: 12,
+    alignSelf: 'center',
+  },
+  deleteAccountLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    color: NEO.ink,
   },
   authPrompt: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: 32,
+  },
+  authIconWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.yellow,
+    boxShadow: BRUTAL_SHADOW,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 22,
+    marginRight: 4,
   },
   authTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 24,
+    fontSize: 22,
+    fontWeight: '900',
+    color: NEO.ink,
+    marginTop: 12,
+    letterSpacing: -0.5,
+    textAlign: 'center',
   },
   authSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: NEO.ink,
     textAlign: 'center',
     marginTop: 8,
-    marginBottom: 32,
+    marginBottom: 28,
+    fontWeight: '600',
   },
   authButton: {
     width: '100%',
-    borderRadius: 12,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
     marginBottom: 12,
+    marginRight: 4,
   },
   authButtonOutlined: {
     width: '100%',
-    borderRadius: 12,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
+  },
+  authBtnLabel: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

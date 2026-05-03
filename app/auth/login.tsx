@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, TextInput, Button, Surface, HelperText } from 'react-native-paper';
+import {
+  View,
+  StyleSheet,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+} from 'react-native';
+import { Text, TextInput, Button, HelperText } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useUserStore } from '../../stores/userStore';
+import { useGoogleAuth } from '../../hooks';
 import { isValidEmail } from '../../utils/helpers';
+import { NEO, BRUTAL, BRUTAL_SHADOW } from '../../constants/theme';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -12,7 +21,9 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  const { signIn, isLoading, error, clearError } = useUserStore();
+  const { signIn, sendPasswordReset, isLoading, error, clearError } = useUserStore();
+  const { prompt: promptGoogle, ready: googleReady } = useGoogleAuth();
+  const [isResetting, setIsResetting] = useState(false);
 
   const validate = (): boolean => {
     const newErrors: { email?: string; password?: string } = {};
@@ -39,7 +50,31 @@ export default function LoginScreen() {
       await signIn(email.trim(), password);
       router.replace('/(tabs)');
     } catch (err) {
-      // Error is handled by the store
+      // Error handled by store
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    clearError();
+    const trimmed = email.trim();
+    if (!trimmed || !isValidEmail(trimmed)) {
+      setErrors((prev) => ({
+        ...prev,
+        email: 'Enter your email above to reset your password.',
+      }));
+      return;
+    }
+    setIsResetting(true);
+    try {
+      await sendPasswordReset(trimmed);
+      Alert.alert(
+        'Check your email',
+        `If an account exists for ${trimmed}, we've sent a password-reset link.`
+      );
+    } catch (err: any) {
+      Alert.alert('Could not send reset email', err?.message ?? 'Please try again.');
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -50,27 +85,27 @@ export default function LoginScreen() {
         style={styles.keyboardView}
       >
         <View style={styles.content}>
-          {/* Header */}
           <View style={styles.header}>
             <Button
               mode="text"
               onPress={() => router.back()}
               icon="close"
-              style={styles.closeButton}
+              textColor={NEO.ink}
+              labelStyle={styles.closeLabel}
             >
-              Close
+              CLOSE
             </Button>
           </View>
 
-          {/* Logo */}
           <View style={styles.logoContainer}>
-            <MaterialCommunityIcons name="book-open-page-variant" size={64} color="#6366F1" />
-            <Text style={styles.title}>Welcome Back</Text>
+            <View style={styles.logoBadge}>
+              <MaterialCommunityIcons name="book-open-page-variant" size={36} color={NEO.ink} />
+            </View>
+            <Text style={styles.title}>WELCOME BACK</Text>
             <Text style={styles.subtitle}>Sign in to continue learning</Text>
           </View>
 
-          {/* Form */}
-          <Surface style={styles.form} elevation={2}>
+          <View style={styles.form}>
             <TextInput
               label="Email"
               value={email}
@@ -84,6 +119,8 @@ export default function LoginScreen() {
               autoComplete="email"
               error={!!errors.email}
               style={styles.input}
+              outlineColor={NEO.ink}
+              activeOutlineColor={NEO.ink}
               left={<TextInput.Icon icon="email" />}
             />
             {errors.email && (
@@ -103,6 +140,8 @@ export default function LoginScreen() {
               secureTextEntry={!showPassword}
               error={!!errors.password}
               style={styles.input}
+              outlineColor={NEO.ink}
+              activeOutlineColor={NEO.ink}
               left={<TextInput.Icon icon="lock" />}
               right={
                 <TextInput.Icon
@@ -130,28 +169,56 @@ export default function LoginScreen() {
               disabled={isLoading}
               style={styles.loginButton}
               contentStyle={styles.loginButtonContent}
+              buttonColor={NEO.ink}
+              textColor={NEO.white}
+              labelStyle={styles.loginLabel}
             >
-              Sign In
+              SIGN IN
+            </Button>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <Button
+              mode="contained"
+              onPress={() => promptGoogle()}
+              disabled={!googleReady || isLoading}
+              style={styles.googleButton}
+              contentStyle={styles.loginButtonContent}
+              buttonColor={NEO.white}
+              textColor={NEO.ink}
+              labelStyle={styles.googleLabel}
+              icon="google"
+            >
+              CONTINUE WITH GOOGLE
             </Button>
 
             <Button
               mode="text"
-              onPress={() => {}}
+              onPress={handleForgotPassword}
+              loading={isResetting}
+              disabled={isResetting}
               style={styles.forgotButton}
+              textColor={NEO.ink}
+              labelStyle={styles.forgotLabel}
             >
-              Forgot Password?
+              FORGOT PASSWORD?
             </Button>
-          </Surface>
+          </View>
 
-          {/* Sign Up Link */}
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Don't have an account? </Text>
             <Button
               mode="text"
               onPress={() => router.replace('/auth/signup')}
               compact
+              textColor={NEO.ink}
+              labelStyle={styles.signupLink}
             >
-              Sign Up
+              SIGN UP
             </Button>
           </View>
         </View>
@@ -163,7 +230,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: NEO.cream,
   },
   keyboardView: {
     flex: 1,
@@ -176,46 +243,112 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
   },
-  closeButton: {
-    marginLeft: -8,
+  closeLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 32,
+    marginTop: 18,
+    marginBottom: 28,
+  },
+  logoBadge: {
+    width: 76,
+    height: 76,
+    backgroundColor: NEO.yellow,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+    marginRight: 4,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 16,
+    fontSize: 30,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -1,
+    marginTop: 10,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: NEO.ink,
     marginTop: 8,
+    fontWeight: '600',
   },
   form: {
-    borderRadius: 20,
-    padding: 24,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BRUTAL.radius,
+    padding: 22,
+    backgroundColor: NEO.white,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
   input: {
     marginBottom: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: NEO.white,
   },
   errorText: {
     marginBottom: 8,
   },
   loginButton: {
-    marginTop: 16,
-    borderRadius: 12,
+    marginTop: 14,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
   loginButtonContent: {
-    paddingVertical: 8,
+    paddingVertical: 6,
+  },
+  loginLabel: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 4,
+    gap: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: NEO.ink,
+  },
+  dividerText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.4,
+  },
+  googleButton: {
+    marginTop: 12,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
+  },
+  googleLabel: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   forgotButton: {
     marginTop: 8,
+  },
+  forgotLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   signupContainer: {
     flexDirection: 'row',
@@ -224,6 +357,12 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   signupText: {
-    color: '#6B7280',
+    color: NEO.ink,
+    fontWeight: '600',
+  },
+  signupLink: {
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

@@ -5,14 +5,47 @@ import { PaperProvider } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useUserStore } from '../stores/userStore';
+import { useVocabStore } from '../stores/vocabStore';
 import { lightTheme, darkTheme } from '../constants/theme';
 import { subscribeToAuthChanges, getCurrentUser } from '../services/auth';
+import { runGrowthCycle } from '../services/growthEngine';
+import { syncRemoteVocab } from '../services/vocabManifest';
+import { syncWordOfTheDayWidget } from '../widgets/sync';
 
 export default function RootLayout() {
   const { settings } = useSettingsStore();
   const { setUser, isAuthenticated } = useUserStore();
+  const vocabularies = useVocabStore((s) => s.vocabularies);
 
   const theme = settings.theme === 'dark' ? darkTheme : lightTheme;
+
+  // Push today's word to the home-screen widget whenever the vocab list
+  // changes (initial seed, growth cycle, etc.). The sync function no-ops on
+  // platforms where the widget native module isn't available.
+  useEffect(() => {
+    syncWordOfTheDayWidget(vocabularies).catch((e) =>
+      console.warn('[widget-sync] sync failed:', e)
+    );
+  }, [vocabularies]);
+
+  useEffect(() => {
+    // Weekly automatic vocabulary growth from the local pool.
+    try {
+      runGrowthCycle();
+    } catch (e) {
+      console.warn('[growth] cycle failed', e);
+    }
+
+    // Layer 1 freshness: pull any new approved terms from the remote manifest.
+    // No-op when EXPO_PUBLIC_VOCAB_MANIFEST_URL isn't configured.
+    syncRemoteVocab()
+      .then((r) => {
+        if (r.added > 0) {
+          console.info(`[vocab-manifest] applied v${r.remoteVersion}, +${r.added} terms`);
+        }
+      })
+      .catch((e) => console.warn('[vocab-manifest] sync failed', e));
+  }, []);
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -60,13 +93,6 @@ export default function RootLayout() {
             options={{
               presentation: 'modal',
               animation: 'slide_from_bottom',
-            }}
-          />
-          <Stack.Screen
-            name="vocab/[id]"
-            options={{
-              presentation: 'card',
-              animation: 'slide_from_right',
             }}
           />
         </Stack>

@@ -151,9 +151,7 @@ export const getUrgencyLevel = (progress: UserProgress): number => {
 
   if (dueDate > now) return 0;
 
-  const overdueDays = Math.floor(
-    (now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const overdueDays = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
 
   // Normalize to 0-1 range, capping at 7 days overdue
   return Math.min(1, overdueDays / 7);
@@ -162,10 +160,7 @@ export const getUrgencyLevel = (progress: UserProgress): number => {
 /**
  * Calculate streak based on consecutive study days
  */
-export const calculateStreak = (
-  lastStudyDate: Date | null,
-  currentStreak: number
-): number => {
+export const calculateStreak = (lastStudyDate: Date | null, currentStreak: number): number => {
   if (!lastStudyDate) return 1;
 
   const now = new Date();
@@ -175,9 +170,7 @@ export const calculateStreak = (
   now.setHours(0, 0, 0, 0);
   lastStudy.setHours(0, 0, 0, 0);
 
-  const diffDays = Math.floor(
-    (now.getTime() - lastStudy.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const diffDays = Math.floor((now.getTime() - lastStudy.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diffDays === 0) {
     // Same day, streak unchanged
@@ -194,7 +187,9 @@ export const calculateStreak = (
 /**
  * Get mastery level based on review count and ease factor
  */
-export const getMasteryLevel = (progress: UserProgress): 'novice' | 'learning' | 'familiar' | 'proficient' | 'mastered' => {
+export const getMasteryLevel = (
+  progress: UserProgress
+): 'novice' | 'learning' | 'familiar' | 'proficient' | 'mastered' => {
   const { reviewCount, easeFactor, status, interval } = progress;
 
   if (status === 'new' || reviewCount === 0) {

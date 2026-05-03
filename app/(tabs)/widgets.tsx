@@ -1,151 +1,153 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
-import { Text, Surface, Switch, Chip, Button, Divider } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, SafeAreaView, Pressable } from 'react-native';
+import { Text, Switch, Button } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Widget, WidgetGrid } from '../../components';
+import { WidgetGrid } from '../../components';
 import {
-  useWidgetStore,
-  WIDGET_CATALOG,
-  WidgetConfig,
-  WidgetSize,
-} from '../../stores/widgetStore';
+  useThemedColors,
+  NEO,
+  BRUTAL,
+  BRUTAL_SHADOW,
+  BRUTAL_SHADOW_SM,
+} from '../../constants/theme';
+import { useWidgetStore, WIDGET_CATALOG, WidgetSize } from '../../stores/widgetStore';
 
 export default function WidgetsScreen() {
-  const { widgets, toggleWidget, setWidgetSize, reorderWidget, resetWidgets } =
-    useWidgetStore();
+  const { widgets, toggleWidget, setWidgetSize, reorderWidget, resetWidgets } = useWidgetStore();
+  const c = useThemedColors();
 
   const enabled = widgets.filter((w) => w.enabled);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Widgets</Text>
-            <Text style={styles.subtitle}>
-              Personalize your home — pick what matters today.
-            </Text>
+            <Text style={styles.title}>WIDGETS</Text>
+            <Text style={styles.subtitle}>PERSONALIZE YOUR HOME</Text>
           </View>
-          <MaterialCommunityIcons name="widgets" size={36} color="#6366F1" />
+          <View style={styles.headerIcon}>
+            <MaterialCommunityIcons name="widgets" size={26} color={NEO.ink} />
+          </View>
         </View>
 
-        {/* Live preview */}
-        <Surface style={styles.previewCard} elevation={1}>
+        <View style={styles.previewCard}>
           <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>Preview</Text>
+            <Text style={styles.sectionTitle}>PREVIEW</Text>
             <Text style={styles.sectionHint}>
-              {enabled.length} of {widgets.length} active
+              {enabled.length} OF {widgets.length} ACTIVE
             </Text>
           </View>
 
           {enabled.length === 0 ? (
             <View style={styles.emptyPreview}>
-              <MaterialCommunityIcons name="widgets-outline" size={48} color="#9CA3AF" />
-              <Text style={styles.emptyText}>No widgets enabled</Text>
-              <Text style={styles.emptySubtext}>
-                Toggle one on below to see it here.
-              </Text>
+              <MaterialCommunityIcons name="widgets-outline" size={42} color={NEO.ink} />
+              <Text style={styles.emptyText}>NO WIDGETS ENABLED</Text>
+              <Text style={styles.emptySubtext}>Toggle one on below to see it here.</Text>
             </View>
           ) : (
             <WidgetGrid widgets={enabled} />
           )}
-        </Surface>
+        </View>
 
-        {/* Manage list */}
         <View style={styles.manageList}>
           <Text style={[styles.sectionTitle, { marginHorizontal: 16, marginBottom: 12 }]}>
-            All Widgets
+            ALL WIDGETS
           </Text>
           {widgets.map((w, idx) => {
             const meta = WIDGET_CATALOG.find((c) => c.type === w.type)!;
             const isFirst = idx === 0;
             const isLast = idx === widgets.length - 1;
             return (
-              <Surface key={w.id} style={styles.row} elevation={1}>
+              <View key={w.id} style={styles.row}>
                 <View style={styles.rowHeader}>
-                  <View
-                    style={[
-                      styles.rowIcon,
-                      { backgroundColor: meta.accent[0] + '22' },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={meta.icon as any}
-                      size={20}
-                      color={meta.accent[0]}
-                    />
+                  <View style={[styles.rowIcon, { backgroundColor: meta.accent[0] }]}>
+                    <MaterialCommunityIcons name={meta.icon as any} size={20} color={NEO.ink} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.rowTitle}>{meta.title}</Text>
+                    <Text style={styles.rowTitle}>{meta.title.toUpperCase()}</Text>
                     <Text style={styles.rowDescription}>{meta.description}</Text>
                   </View>
                   <Switch
                     value={w.enabled}
                     onValueChange={() => toggleWidget(w.id)}
+                    color={NEO.ink}
                   />
                 </View>
 
                 {w.enabled && (
                   <>
-                    <Divider style={styles.divider} />
+                    <View style={styles.divider} />
                     <View style={styles.controls}>
                       <View style={styles.sizeRow}>
-                        <Text style={styles.controlLabel}>Size</Text>
+                        <Text style={styles.controlLabel}>SIZE</Text>
                         <View style={styles.sizeChips}>
                           {(['small', 'medium', 'large'] as WidgetSize[]).map((s) => {
                             const supported = meta.supportedSizes.includes(s);
+                            const selected = w.size === s;
                             return (
-                              <Chip
+                              <Pressable
                                 key={s}
-                                selected={w.size === s}
+                                onPress={() => supported && setWidgetSize(w.id, s)}
                                 disabled={!supported}
-                                onPress={() => setWidgetSize(w.id, s)}
-                                compact
-                                style={styles.sizeChip}
                               >
-                                {s[0].toUpperCase() + s.slice(1)}
-                              </Chip>
+                                <View
+                                  style={[
+                                    styles.sizeChip,
+                                    {
+                                      backgroundColor: selected ? NEO.yellow : NEO.white,
+                                      opacity: !supported ? 0.4 : 1,
+                                    },
+                                  ]}
+                                >
+                                  <Text style={styles.sizeChipText}>
+                                    {s[0].toUpperCase() + s.slice(1)}
+                                  </Text>
+                                </View>
+                              </Pressable>
                             );
                           })}
                         </View>
                       </View>
 
                       <View style={styles.reorderRow}>
-                        <Button
-                          icon="arrow-up"
-                          mode="text"
-                          compact
+                        <Pressable
+                          onPress={() => !isFirst && reorderWidget(w.id, 'up')}
                           disabled={isFirst}
-                          onPress={() => reorderWidget(w.id, 'up')}
                         >
-                          Up
-                        </Button>
-                        <Button
-                          icon="arrow-down"
-                          mode="text"
-                          compact
+                          <View style={[styles.reorderBtn, isFirst && { opacity: 0.4 }]}>
+                            <MaterialCommunityIcons name="arrow-up" size={16} color={NEO.ink} />
+                            <Text style={styles.reorderText}>UP</Text>
+                          </View>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => !isLast && reorderWidget(w.id, 'down')}
                           disabled={isLast}
-                          onPress={() => reorderWidget(w.id, 'down')}
                         >
-                          Down
-                        </Button>
+                          <View style={[styles.reorderBtn, isLast && { opacity: 0.4 }]}>
+                            <MaterialCommunityIcons name="arrow-down" size={16} color={NEO.ink} />
+                            <Text style={styles.reorderText}>DOWN</Text>
+                          </View>
+                        </Pressable>
                       </View>
                     </View>
                   </>
                 )}
-              </Surface>
+              </View>
             );
           })}
         </View>
 
         <Button
-          mode="text"
+          mode="contained"
           onPress={resetWidgets}
           style={styles.resetButton}
           icon="restore"
+          buttonColor={NEO.cream}
+          textColor={NEO.ink}
+          labelStyle={styles.resetLabel}
         >
-          Reset to defaults
+          RESET TO DEFAULTS
         </Button>
       </ScrollView>
     </SafeAreaView>
@@ -153,29 +155,51 @@ export default function WidgetsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1 },
   scrollContent: { paddingBottom: 32 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
+    paddingTop: 18,
+    paddingBottom: 14,
     gap: 12,
   },
   title: {
     fontSize: 28,
-    fontWeight: '800',
-    color: '#111827',
-    letterSpacing: -0.5,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: -1,
   },
-  subtitle: { fontSize: 14, color: '#6B7280', marginTop: 4 },
+  subtitle: {
+    fontSize: 11,
+    color: NEO.ink,
+    marginTop: 4,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.lime,
+    boxShadow: BRUTAL_SHADOW_SM,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 3,
+  },
   previewCard: {
     marginHorizontal: 16,
     padding: 16,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 24,
+    borderRadius: BRUTAL.radius,
+    marginBottom: 22,
+    backgroundColor: NEO.white,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 20,
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -184,30 +208,46 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: 13,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1.2,
   },
-  sectionHint: { fontSize: 12, color: '#6B7280' },
+  sectionHint: {
+    fontSize: 11,
+    color: NEO.ink,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
   emptyPreview: {
     alignItems: 'center',
     paddingVertical: 24,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#374151',
+    fontSize: 13,
+    color: NEO.ink,
     marginTop: 8,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  emptySubtext: {
+    fontSize: 12,
+    color: NEO.ink,
+    marginTop: 4,
     fontWeight: '600',
   },
-  emptySubtext: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
   manageList: {
     paddingHorizontal: 16,
   },
   row: {
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BRUTAL.radius,
     padding: 14,
-    marginBottom: 10,
+    marginBottom: 12,
+    backgroundColor: NEO.white,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    marginRight: 4,
   },
   rowHeader: {
     flexDirection: 'row',
@@ -217,13 +257,29 @@ const styles = StyleSheet.create({
   rowIcon: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rowTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  rowDescription: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  divider: { marginVertical: 12 },
+  rowTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 0.4,
+  },
+  rowDescription: {
+    fontSize: 11,
+    color: NEO.ink,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  divider: {
+    height: BRUTAL.border,
+    backgroundColor: NEO.ink,
+    marginVertical: 12,
+  },
   controls: { gap: 12 },
   sizeRow: {
     flexDirection: 'row',
@@ -231,18 +287,60 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   controlLabel: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    color: NEO.ink,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
-  sizeChips: { flexDirection: 'row', gap: 6 },
-  sizeChip: {},
+  sizeChips: { flexDirection: 'row', gap: 5 },
+  sizeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    marginRight: 2,
+  },
+  sizeChipText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 0.4,
+  },
   reorderRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 8,
   },
-  resetButton: { marginTop: 8 },
+  reorderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.cream,
+  },
+  reorderText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 0.6,
+  },
+  resetButton: {
+    marginTop: 12,
+    marginHorizontal: 16,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW_SM,
+    marginRight: 20,
+  },
+  resetLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
 });

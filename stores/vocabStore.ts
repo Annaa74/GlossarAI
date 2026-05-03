@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Vocabulary, UserProgress, VocabCategory, CategoryProgress } from '../types';
 import * as vocabService from '../services/vocabulary';
 import { processReview, swipeToQuality } from '../services/srs';
+import { composeSmartDeck } from '../services/deckComposer';
 
 interface VocabState {
   vocabularies: Vocabulary[];
@@ -19,7 +20,17 @@ interface VocabState {
   fetchVocabularies: () => Promise<void>;
   fetchCardsForReview: (userId: string) => Promise<void>;
   fetchUserProgress: (userId: string) => Promise<void>;
-  processSwipe: (userId: string, vocabId: string, direction: 'left' | 'right' | 'up') => Promise<void>;
+  reloadDeck: () => void;
+  /**
+   * R1 — replace currentCards with a smart blend of due-for-review,
+   * weakest-category, and interleaved cards. See services/deckComposer.ts.
+   */
+  loadSmartDeck: (size?: number) => void;
+  processSwipe: (
+    userId: string,
+    vocabId: string,
+    direction: 'left' | 'right' | 'up'
+  ) => Promise<void>;
   toggleFavorite: (vocabId: string) => void;
   setSelectedCategory: (category: VocabCategory | 'all') => void;
   getCategoryProgress: (userId: string) => Promise<void>;
@@ -40,6 +51,12 @@ export const useVocabStore = create<VocabState>()(
       selectedCategory: 'all',
 
       fetchVocabularies: async () => {
+        // Don't wipe an already-populated local library by hitting an
+        // unconfigured Firestore — keep what we have and let the seed/growth
+        // engine populate it offline.
+        const existing = get().vocabularies;
+        if (existing.length > 0) return;
+
         set({ isLoading: true, error: null });
         try {
           const vocabularies = await vocabService.getAllVocabularies();
@@ -53,6 +70,16 @@ export const useVocabStore = create<VocabState>()(
       },
 
       fetchCardsForReview: async (userId: string) => {
+        // Guest mode = no Firestore. Hydrate currentCards from the persisted
+        // vocabularies, since persist drops currentCards across reloads.
+        if (userId.startsWith('guest-')) {
+          const { vocabularies, currentCards } = get();
+          if (currentCards.length === 0 && vocabularies.length > 0) {
+            set({ currentCards: vocabularies });
+          }
+          return;
+        }
+
         set({ isLoading: true, error: null });
         try {
           const cards = await vocabService.getCardsForReview(userId);
@@ -65,7 +92,27 @@ export const useVocabStore = create<VocabState>()(
         }
       },
 
+      reloadDeck: () => {
+        // Always restore the full vocab list as the active queue. Callers can
+        // filter by category at render time — scoping currentCards itself
+        // would hide other categories until the next manual reload.
+        const { vocabularies } = get();
+        set({ currentCards: vocabularies });
+      },
+
+      loadSmartDeck: (size?: number) => {
+        const { vocabularies, userProgress, categoryProgress } = get();
+        const deck = composeSmartDeck({
+          vocabularies,
+          progress: userProgress,
+          categoryProgress,
+          count: size,
+        });
+        set({ currentCards: deck });
+      },
+
       fetchUserProgress: async (userId: string) => {
+        if (userId.startsWith('guest-')) return; // local-only, nothing to fetch
         try {
           const progressList = await vocabService.getAllUserProgress(userId);
           const progressMap = new Map<string, UserProgress>();
@@ -118,11 +165,13 @@ export const useVocabStore = create<VocabState>()(
           currentCards: newCurrentCards,
         });
 
-        // Persist to Firebase
-        try {
-          await vocabService.updateUserProgress(userId, updatedProgress);
-        } catch (error) {
-          console.error('Failed to save progress:', error);
+        // Persist to Firebase (skipped in guest mode — no project to write to).
+        if (!userId.startsWith('guest-')) {
+          try {
+            await vocabService.updateUserProgress(userId, updatedProgress);
+          } catch (error) {
+            console.error('Failed to save progress:', error);
+          }
         }
       },
 
@@ -144,19 +193,44 @@ export const useVocabStore = create<VocabState>()(
       },
 
       getCategoryProgress: async (userId: string) => {
+        const categories: VocabCategory[] = [
+          'AI/ML',
+          'Agentic AI',
+          'Backend',
+          'Frontend',
+          'DevOps',
+          'Cloud',
+          'Databases',
+          'Security',
+        ];
+
+        // Guest mode (or no user): derive everything from the local store.
+        if (userId.startsWith('guest-')) {
+          const { vocabularies, userProgress } = get();
+          const categoryProgress: CategoryProgress[] = categories.map((category) => {
+            const inCat = vocabularies.filter((v) => v.category === category);
+            let known = 0;
+            let learning = 0;
+            inCat.forEach((v) => {
+              const p = userProgress.get(v.id);
+              if (p?.status === 'known') known++;
+              else if (p?.status === 'learning') learning++;
+            });
+            return {
+              category,
+              total: inCat.length,
+              known,
+              learning,
+              new: inCat.length - known - learning,
+              percentMastered: inCat.length > 0 ? Math.round((known / inCat.length) * 100) : 0,
+            };
+          });
+          set({ categoryProgress });
+          return;
+        }
+
         try {
           const stats = await vocabService.getCategoryStats(userId);
-          const categories: VocabCategory[] = [
-            'AI/ML',
-            'Agentic AI',
-            'Backend',
-            'Frontend',
-            'DevOps',
-            'Cloud',
-            'Databases',
-            'Security',
-          ];
-
           const categoryProgress: CategoryProgress[] = categories.map((category) => {
             const stat = stats[category];
             return {
@@ -168,7 +242,6 @@ export const useVocabStore = create<VocabState>()(
               percentMastered: stat.total > 0 ? Math.round((stat.known / stat.total) * 100) : 0,
             };
           });
-
           set({ categoryProgress });
         } catch (error) {
           console.error('Failed to get category progress:', error);

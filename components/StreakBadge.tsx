@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text, Surface } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { NEO, BRUTAL, BRUTAL_SHADOW, BRUTAL_SHADOW_SM } from '../constants/theme';
 
 interface StreakBadgeProps {
   streak: number;
@@ -15,83 +16,49 @@ export const StreakBadge: React.FC<StreakBadgeProps> = ({
   showLabel = true,
 }) => {
   const getStreakColor = () => {
-    if (streak >= 30) return '#F59E0B'; // Gold
-    if (streak >= 14) return '#F97316'; // Orange
-    if (streak >= 7) return '#EF4444'; // Red
-    if (streak >= 3) return '#EC4899'; // Pink
-    return '#9CA3AF'; // Gray
-  };
-
-  const getStreakIcon = () => {
-    if (streak >= 30) return 'fire';
-    if (streak >= 14) return 'fire';
-    if (streak >= 7) return 'fire';
-    if (streak >= 3) return 'fire';
-    return 'fire';
+    if (streak >= 30) return NEO.orange;
+    if (streak >= 14) return NEO.pink;
+    if (streak >= 7) return NEO.yellow;
+    if (streak >= 3) return NEO.lime;
+    return NEO.cream;
   };
 
   const getStreakLabel = () => {
-    if (streak >= 30) return 'On Fire!';
-    if (streak >= 14) return 'Amazing!';
-    if (streak >= 7) return 'Great!';
-    if (streak >= 3) return 'Good!';
-    return 'Keep going!';
+    if (streak >= 30) return 'ON FIRE!';
+    if (streak >= 14) return 'AMAZING!';
+    if (streak >= 7) return 'GREAT!';
+    if (streak >= 3) return 'GOOD!';
+    return 'KEEP GOING';
   };
 
-  const sizes = {
-    small: {
-      container: { padding: 8 },
-      icon: 16,
-      number: 16,
-      label: 10,
-    },
-    medium: {
-      container: { padding: 12 },
-      icon: 24,
-      number: 24,
-      label: 12,
-    },
-    large: {
-      container: { padding: 20 },
-      icon: 40,
-      number: 48,
-      label: 16,
-    },
-  };
-
-  const sizeConfig = sizes[size];
   const color = getStreakColor();
 
   if (size === 'large') {
     return (
-      <Surface style={[styles.largeContainer, sizeConfig.container]} elevation={3}>
+      <View style={[styles.largeContainer, { backgroundColor: color }]}>
         <View style={styles.largeContent}>
-          <View style={[styles.fireBackground, { backgroundColor: color + '20' }]}>
-            <MaterialCommunityIcons name={getStreakIcon() as any} size={sizeConfig.icon} color={color} />
+          <View style={styles.fireBackground}>
+            <MaterialCommunityIcons name="fire" size={40} color={NEO.ink} />
           </View>
-          <Text style={[styles.largeNumber, { color, fontSize: sizeConfig.number }]}>
-            {streak}
-          </Text>
-          <Text style={[styles.largeLabel, { fontSize: sizeConfig.label }]}>
-            day streak
-          </Text>
+          <Text style={styles.largeNumber}>{streak}</Text>
+          <Text style={styles.largeLabel}>DAY STREAK</Text>
           {showLabel && (
-            <View style={[styles.badge, { backgroundColor: color }]}>
+            <View style={styles.badge}>
               <Text style={styles.badgeText}>{getStreakLabel()}</Text>
             </View>
           )}
         </View>
-      </Surface>
+      </View>
     );
   }
 
+  const isSmall = size === 'small';
+
   return (
-    <View style={[styles.container, sizeConfig.container]}>
-      <MaterialCommunityIcons name={getStreakIcon() as any} size={sizeConfig.icon} color={color} />
-      <Text style={[styles.number, { color, fontSize: sizeConfig.number }]}>{streak}</Text>
-      {showLabel && size === 'medium' && (
-        <Text style={[styles.label, { fontSize: sizeConfig.label }]}>day streak</Text>
-      )}
+    <View style={[styles.container, { backgroundColor: color }, isSmall && styles.containerSmall]}>
+      <MaterialCommunityIcons name="fire" size={isSmall ? 14 : 20} color={NEO.ink} />
+      <Text style={[styles.number, isSmall && styles.numberSmall]}>{streak}</Text>
+      {showLabel && size === 'medium' && <Text style={styles.label}>DAYS</Text>}
     </View>
   );
 };
@@ -100,50 +67,83 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 20,
-    paddingHorizontal: 12,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW_SM,
+  },
+  containerSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   number: {
-    fontWeight: '700',
-    marginLeft: 4,
+    fontWeight: '900',
+    fontSize: 18,
+    color: NEO.ink,
+    letterSpacing: -0.5,
+  },
+  numberSmall: {
+    fontSize: 14,
   },
   label: {
-    color: '#92400E',
-    marginLeft: 4,
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 0.8,
+    marginLeft: 2,
   },
   largeContainer: {
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    boxShadow: BRUTAL_SHADOW,
+    padding: 24,
+    alignSelf: 'stretch',
   },
   largeContent: {
     alignItems: 'center',
   },
   fireBackground: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.borderThick,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.white,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
   largeNumber: {
-    fontWeight: '800',
+    fontWeight: '900',
+    fontSize: 56,
+    color: NEO.ink,
+    letterSpacing: -2,
   },
   largeLabel: {
-    color: '#6B7280',
-    marginTop: 4,
+    color: NEO.ink,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+    marginTop: -4,
   },
   badge: {
-    marginTop: 16,
-    paddingHorizontal: 16,
+    marginTop: 14,
+    paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.ink,
   },
   badgeText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 14,
+    color: NEO.white,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 1.2,
   },
 });
 

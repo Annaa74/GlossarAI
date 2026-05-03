@@ -16,8 +16,7 @@ import { Vocabulary, VocabCategory, UserProgress, CardStatus } from '../types';
 
 // Collection references
 const vocabCollection = collection(db, 'vocabularies');
-const progressCollection = (userId: string) =>
-  collection(db, 'userProgress', userId, 'cards');
+const progressCollection = (userId: string) => collection(db, 'userProgress', userId, 'cards');
 
 // Fetch all approved vocabularies
 export const getAllVocabularies = async (): Promise<Vocabulary[]> => {
@@ -32,9 +31,7 @@ export const getAllVocabularies = async (): Promise<Vocabulary[]> => {
 };
 
 // Fetch vocabularies by category
-export const getVocabulariesByCategory = async (
-  category: VocabCategory
-): Promise<Vocabulary[]> => {
+export const getVocabulariesByCategory = async (category: VocabCategory): Promise<Vocabulary[]> => {
   const q = query(
     vocabCollection,
     where('approved', '==', true),
@@ -121,9 +118,7 @@ export const updateUserProgress = async (
     interval: progress.interval,
     nextReviewDate: Timestamp.fromDate(progress.nextReviewDate),
     reviewCount: progress.reviewCount,
-    lastReviewDate: progress.lastReviewDate
-      ? Timestamp.fromDate(progress.lastReviewDate)
-      : null,
+    lastReviewDate: progress.lastReviewDate ? Timestamp.fromDate(progress.lastReviewDate) : null,
   });
 };
 

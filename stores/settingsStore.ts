@@ -19,7 +19,7 @@ interface SettingsState {
 }
 
 const defaultSettings: AppSettings = {
-  theme: 'system',
+  theme: 'dark',
   dailyGoal: 10,
   soundEnabled: true,
   hapticEnabled: true,
