@@ -1,19 +1,12 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
-import {
-  View,
-  StyleSheet,
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-  Pressable,
-  Modal,
-} from 'react-native';
+import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
+import { View, StyleSheet, Dimensions, ScrollView, Pressable, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Swiper from 'react-native-deck-swiper';
 import { router } from 'expo-router';
-import { SwipeCard, StreakBadge, WidgetCarousel } from '../../components';
-import { useVocabulary, useSpacedRepetition } from '../../hooks';
+import { SwipeCard, StreakBadge } from '../../components';
+import { useVocabulary, useSwipeHandler } from '../../hooks';
 import { useUserStore } from '../../stores/userStore';
 import { useVocabStore } from '../../stores/vocabStore';
 import { Vocabulary, VocabCategory } from '../../types';
@@ -41,40 +34,55 @@ export default function HomeScreen() {
   }>({ visible: false, category: 'all', count: 0 });
   const c = useThemedColors();
 
-  const { user, isAuthenticated } = useUserStore();
-  const {
-    vocabularies,
-    currentCards,
-    isLoading,
-    selectedCategory,
-    setSelectedCategory,
-    refreshCards,
-  } = useVocabulary();
-  const { handleSwipe } = useSpacedRepetition();
+  // Narrow selectors only — crucially, we DO NOT subscribe to currentCards
+  // here. processSwipe filters that array on every swipe; subscribing to it
+  // would re-render HomeScreen mid-animation and cause the deck to jitter.
+  // We read currentCards lazily via getState() inside the seed effect below.
+  const userDisplayName = useUserStore((s) => s.user?.displayName);
+  const userStreak = useUserStore((s) => s.user?.streak);
+  const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  const vocabularies = useVocabStore((s) => s.vocabularies);
+  const isLoading = useVocabStore((s) => s.isLoading);
+  const selectedCategory = useVocabStore((s) => s.selectedCategory);
+  const setSelectedCategory = useVocabStore((s) => s.setSelectedCategory);
+  const fetchVocabularies = useVocabStore((s) => s.fetchVocabularies);
+  const fetchCardsForReview = useVocabStore((s) => s.fetchCardsForReview);
   const reloadDeck = useVocabStore((s) => s.reloadDeck);
   const loadSmartDeck = useVocabStore((s) => s.loadSmartDeck);
+  const userId = useUserStore((s) => s.user?.id);
+  const { handleSwipe } = useSwipeHandler();
 
-  const filteredCards =
-    selectedCategory === 'all'
-      ? currentCards
-      : currentCards.filter((c) => c.category === selectedCategory);
+  // Kick off vocabulary + review-card loads in parallel on mount / sign-in.
+  useEffect(() => {
+    const tasks: Promise<unknown>[] = [];
+    if (useVocabStore.getState().vocabularies.length === 0) tasks.push(fetchVocabularies());
+    if (userId && useVocabStore.getState().currentCards.length === 0) {
+      tasks.push(fetchCardsForReview(userId));
+    }
+    if (tasks.length > 0) Promise.all(tasks).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
-  // Local snapshot of the deck for the Swiper. We do NOT pass `filteredCards`
+  // Local snapshot of the deck for the Swiper. We do NOT pass `currentCards`
   // directly because:
-  //   (a) processSwipe shrinks `currentCards` on every swipe, which would
+  //   (a) processSwipe shrinks `currentCards` on every swipe — that would
   //       change the Swiper's `cards` prop mid-animation and force it to
-  //       reinitialize — that's the lag/glitch the user sees.
-  //   (b) the Swiper owns its own internal index; driving it via the
-  //       `cardIndex` prop causes a reset on every swipe.
-  // Refresh the snapshot when the category changes, vocab first loads, or
-  // the user explicitly reloads.
-  const [sessionDeck, setSessionDeck] = useState<Vocabulary[]>(filteredCards);
+  //       reinitialize, causing the lag/jitter.
+  //   (b) the Swiper owns its own internal index; driving it via `cardIndex`
+  //       causes a reset on every swipe.
+  // Re-seed only when the category changes or vocab data first arrives.
+  const [sessionDeck, setSessionDeck] = useState<Vocabulary[]>(() => {
+    const all = useVocabStore.getState().currentCards;
+    return all;
+  });
   const [swiperKey, setSwiperKey] = useState(0);
 
   useEffect(() => {
-    setSessionDeck(filteredCards);
+    const all = useVocabStore.getState().currentCards;
+    const next =
+      selectedCategory === 'all' ? all : all.filter((c) => c.category === selectedCategory);
+    setSessionDeck(next);
     setSwiperKey((k) => k + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, vocabularies.length]);
 
   const dismissCompletion = useCallback(() => {
@@ -143,6 +151,37 @@ export default function HomeScreen() {
     setSessionDeck([]);
   }, [selectedCategory, sessionDeck.length]);
 
+  // Stable across renders (only changes when deckHeight changes) so the
+  // deck-swiper doesn't rebuild card cells when unrelated state updates.
+  // Must live above the early returns below — hooks have to run unconditionally.
+  // Subtract just enough to fit the card's drop shadow (BRUTAL_SHADOW_LG=6px).
+  const cardHeight = deckHeight > 0 ? deckHeight - 8 : undefined;
+  const renderSwipeCard = useCallback(
+    (card: Vocabulary) => (card ? <SwipeCard vocab={card} height={cardHeight} /> : null),
+    [cardHeight]
+  );
+
+  // Memoized so the Swiper doesn't see a new prop reference each render —
+  // a fresh `overlayLabels` object would force the library to re-mount its
+  // overlay labels mid-animation.
+  const overlayLabels = useMemo(
+    () => ({
+      left: {
+        title: 'LEARNING',
+        style: { label: styles.overlayLabelLeft, wrapper: styles.overlayWrapperLeft },
+      },
+      right: {
+        title: 'KNOWN',
+        style: { label: styles.overlayLabelRight, wrapper: styles.overlayWrapperRight },
+      },
+      top: {
+        title: 'FAVORITE',
+        style: { label: styles.overlayLabelTop, wrapper: styles.overlayWrapperTop },
+      },
+    }),
+    []
+  );
+
   const handleSeedData = async () => {
     setIsSeeding(true);
     try {
@@ -174,7 +213,10 @@ export default function HomeScreen() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: c.bg }]}
+        edges={['top', 'left', 'right']}
+      >
         <View style={styles.authPromptWrap}>
           <View style={styles.heroHero}>
             <View style={styles.heroIconWrap}>
@@ -224,9 +266,15 @@ export default function HomeScreen() {
     );
   }
 
-  if (isLoading) {
+  // Only block the screen on the spinner when we genuinely have no data yet.
+  // Once vocabularies are hydrated (from persist or the initial fetch), the
+  // optimistic deck seed lets users start swiping immediately.
+  if (isLoading && vocabularies.length === 0) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: c.bg }]}
+        edges={['top', 'left', 'right']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={NEO.ink} />
           <Text style={styles.loadingText}>LOADING YOUR CARDS…</Text>
@@ -237,7 +285,10 @@ export default function HomeScreen() {
 
   if (vocabularies.length === 0) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: c.bg }]}
+        edges={['top', 'left', 'right']}
+      >
         <View style={styles.emptyContainer}>
           <View style={styles.emptyArt}>
             <MaterialCommunityIcons name="auto-fix" size={64} color={NEO.ink} />
@@ -268,22 +319,21 @@ export default function HomeScreen() {
   const noCards = sessionDeck.length === 0;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: c.bg }]}
+      edges={['top', 'left', 'right']}
+    >
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.greeting}>
             {getGreeting().toUpperCase()}
-            {user?.displayName ? `, ${user.displayName.split(' ')[0].toUpperCase()}` : ''}
+            {userDisplayName ? `, ${userDisplayName.split(' ')[0].toUpperCase()}` : ''}
           </Text>
           <Text style={styles.subGreeting}>
             {noCards ? 'NO CARDS IN THIS CATEGORY' : `${sessionDeck.length} CARDS IN YOUR DECK`}
           </Text>
         </View>
-        {user && <StreakBadge streak={user.streak} size="small" />}
-      </View>
-
-      <View style={styles.widgetSection}>
-        <WidgetCarousel />
+        {typeof userStreak === 'number' && <StreakBadge streak={userStreak} size="small" />}
       </View>
 
       <ScrollView
@@ -321,11 +371,11 @@ export default function HomeScreen() {
             <View style={styles.completedIcon}>
               <MaterialCommunityIcons name="cards-outline" size={42} color={NEO.ink} />
             </View>
-            <Text style={styles.completedTitle}>DECK CLEAR</Text>
+            <Text style={styles.completedTitle}>TODAY&apos;S DECK COMPLETE</Text>
             <Text style={styles.completedSubtitle}>
               {selectedCategory === 'all'
-                ? 'You finished every card. Take a quiz or reload to keep practicing.'
-                : `Done with ${getCategoryInfo(selectedCategory as VocabCategory).name}. Quiz yourself or reload.`}
+                ? 'Nice — you reviewed every card today. Lock it in with a quick quiz.'
+                : `Nice — you reviewed every ${getCategoryInfo(selectedCategory as VocabCategory).name} card. Lock it in with a quick quiz.`}
             </Text>
             <View style={styles.completedActions}>
               <Button
@@ -362,45 +412,19 @@ export default function HomeScreen() {
             key={swiperKey}
             ref={swiperRef}
             cards={sessionDeck}
-            renderCard={(card) =>
-              card ? (
-                <SwipeCard vocab={card} height={deckHeight > 0 ? deckHeight - 16 : undefined} />
-              ) : null
-            }
+            renderCard={renderSwipeCard}
             onSwipedLeft={onSwipedLeft}
             onSwipedRight={onSwipedRight}
             onSwipedTop={onSwipedTop}
             onSwipedAll={onSwipedAll}
             backgroundColor="transparent"
-            stackSize={3}
+            stackSize={2}
             stackSeparation={10}
-            cardVerticalMargin={4}
+            cardVerticalMargin={0}
             cardHorizontalMargin={16}
-            animateOverlayLabelsOpacity
             disableBottomSwipe
-            overlayLabels={{
-              left: {
-                title: 'LEARNING',
-                style: {
-                  label: styles.overlayLabelLeft,
-                  wrapper: styles.overlayWrapperLeft,
-                },
-              },
-              right: {
-                title: 'KNOWN',
-                style: {
-                  label: styles.overlayLabelRight,
-                  wrapper: styles.overlayWrapperRight,
-                },
-              },
-              top: {
-                title: 'FAVORITE',
-                style: {
-                  label: styles.overlayLabelTop,
-                  wrapper: styles.overlayWrapperTop,
-                },
-              },
-            }}
+            useViewOverflow={false}
+            overlayLabels={overlayLabels}
           />
         )}
       </View>
@@ -529,8 +553,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 6,
+    paddingTop: 8,
+    paddingBottom: 4,
     gap: 12,
   },
   greeting: {
@@ -546,8 +570,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1,
   },
-
-  widgetSection: { marginTop: 6, marginBottom: 4 },
 
   sectionRow: {
     flexDirection: 'row',
@@ -572,8 +594,8 @@ const styles = StyleSheet.create({
 
   categoryStrip: {
     paddingHorizontal: 16,
-    paddingVertical: 2,
-    paddingBottom: 6,
+    paddingTop: 0,
+    paddingBottom: 2,
     gap: 8,
     paddingRight: 24,
   },
@@ -582,13 +604,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 6,
     borderRadius: BRUTAL.radius,
     borderWidth: BRUTAL.border,
     borderColor: NEO.ink,
     boxShadow: BRUTAL_SHADOW_SM,
-    marginRight: 3,
-    marginBottom: 4,
   },
   categoryPillText: {
     fontSize: 12,

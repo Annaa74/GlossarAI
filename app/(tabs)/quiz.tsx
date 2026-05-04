@@ -216,6 +216,10 @@ export default function QuizScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: c.bg }]}>
         <QuizQuestionComponent
+          // Remount per question so selectedAnswer / textAnswer / hasSubmitted
+          // reset between questions. Without this, the second question would
+          // inherit the previous answer state and feel broken.
+          key={currentQuestion.id}
           question={currentQuestion}
           vocabulary={vocab}
           onAnswer={handleAnswer}

@@ -70,25 +70,27 @@ export const useVocabStore = create<VocabState>()(
       },
 
       fetchCardsForReview: async (userId: string) => {
-        // Guest mode = no Firestore. Hydrate currentCards from the persisted
-        // vocabularies, since persist drops currentCards across reloads.
-        if (userId.startsWith('guest-')) {
-          const { vocabularies, currentCards } = get();
-          if (currentCards.length === 0 && vocabularies.length > 0) {
-            set({ currentCards: vocabularies });
-          }
-          return;
+        const { vocabularies, currentCards } = get();
+
+        // Optimistic seed: as soon as we have vocabularies, render *something*
+        // so the home screen isn't stuck on a spinner while Firestore loads.
+        // The Firestore fetch below will replace this with the SRS-prioritized
+        // queue when it arrives. (sessionDeck on the home screen is a snapshot,
+        // so this swap won't disrupt an in-progress study session.)
+        if (currentCards.length === 0 && vocabularies.length > 0) {
+          set({ currentCards: vocabularies });
         }
 
-        set({ isLoading: true, error: null });
+        // Guest mode = no Firestore, so the optimistic seed is the final state.
+        if (userId.startsWith('guest-')) return;
+
+        // Don't flip global isLoading here — we already have cards on screen.
+        // Errors still surface via the `error` field.
         try {
           const cards = await vocabService.getCardsForReview(userId);
-          set({ currentCards: cards, isLoading: false });
+          if (cards.length > 0) set({ currentCards: cards });
         } catch (error: any) {
-          set({
-            error: error.message || 'Failed to fetch cards for review',
-            isLoading: false,
-          });
+          set({ error: error.message || 'Failed to fetch cards for review' });
         }
       },
 

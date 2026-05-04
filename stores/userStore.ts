@@ -127,6 +127,17 @@ export const useUserStore = create<UserState>()(
         const { user } = get();
         if (!user) return;
 
+        // Hot-path guard: this is called after every swipe. If we already
+        // recorded a study day today, calculateStreak returns the same value
+        // — skip the set() and the Firestore write to keep swiping smooth.
+        if (user.lastStudyDate) {
+          const last = new Date(user.lastStudyDate);
+          last.setHours(0, 0, 0, 0);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (last.getTime() === today.getTime()) return;
+        }
+
         const newStreak = calculateStreak(user.lastStudyDate, user.streak);
         const updatedUser = {
           ...user,

@@ -12,7 +12,7 @@ const dailySeed = (): number => {
 };
 
 export const useWordOfTheDay = (category?: VocabCategory | 'all'): Vocabulary | null => {
-  const { vocabularies } = useVocabStore();
+  const vocabularies = useVocabStore((s) => s.vocabularies);
 
   return useMemo(() => {
     const pool =

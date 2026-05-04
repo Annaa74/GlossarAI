@@ -4,65 +4,50 @@ import { useUserStore } from '../stores/userStore';
 import { VocabCategory } from '../types';
 
 export const useVocabulary = () => {
-  const {
-    vocabularies,
-    currentCards,
-    isLoading,
-    error,
-    selectedCategory,
-    fetchVocabularies,
-    fetchCardsForReview,
-    setSelectedCategory,
-    getVocabById,
-    clearError,
-  } = useVocabStore();
+  const vocabularies = useVocabStore((s) => s.vocabularies);
+  const currentCards = useVocabStore((s) => s.currentCards);
+  const isLoading = useVocabStore((s) => s.isLoading);
+  const error = useVocabStore((s) => s.error);
+  const selectedCategory = useVocabStore((s) => s.selectedCategory);
+  const fetchVocabularies = useVocabStore((s) => s.fetchVocabularies);
+  const fetchCardsForReview = useVocabStore((s) => s.fetchCardsForReview);
+  const setSelectedCategory = useVocabStore((s) => s.setSelectedCategory);
+  const getVocabById = useVocabStore((s) => s.getVocabById);
+  const clearError = useVocabStore((s) => s.clearError);
 
-  const { user } = useUserStore();
+  const userId = useUserStore((s) => s.user?.id);
 
-  // Fetch vocabularies on mount
+  // Kick off vocabulary + review-card loads in parallel on mount / sign-in.
+  // Previously these ran sequentially, so the home screen sat on the spinner
+  // through both round-trips even though the deck only needs `vocabularies`.
   useEffect(() => {
-    if (vocabularies.length === 0) {
-      fetchVocabularies();
-    }
-  }, []);
+    const tasks: Promise<unknown>[] = [];
+    if (vocabularies.length === 0) tasks.push(fetchVocabularies());
+    if (userId && currentCards.length === 0) tasks.push(fetchCardsForReview(userId));
+    if (tasks.length > 0) Promise.all(tasks).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
-  // Fetch cards for review when user is available
-  useEffect(() => {
-    if (user?.id && currentCards.length === 0) {
-      fetchCardsForReview(user.id);
-    }
-  }, [user?.id]);
-
-  // Get cards filtered by category
   const getCardsByCategory = useCallback(
     (category: VocabCategory | 'all') => {
-      if (category === 'all') {
-        return currentCards;
-      }
+      if (category === 'all') return currentCards;
       return currentCards.filter((card) => card.category === category);
     },
     [currentCards]
   );
 
-  // Get all vocabularies filtered by category
   const getVocabulariesByCategory = useCallback(
     (category: VocabCategory | 'all') => {
-      if (category === 'all') {
-        return vocabularies;
-      }
+      if (category === 'all') return vocabularies;
       return vocabularies.filter((vocab) => vocab.category === category);
     },
     [vocabularies]
   );
 
-  // Refresh cards
   const refreshCards = useCallback(async () => {
-    if (user?.id) {
-      await fetchCardsForReview(user.id);
-    }
-  }, [user?.id, fetchCardsForReview]);
+    if (userId) await fetchCardsForReview(userId);
+  }, [userId, fetchCardsForReview]);
 
-  // Search vocabularies
   const searchVocabularies = useCallback(
     (query: string) => {
       const normalizedQuery = query.toLowerCase().trim();

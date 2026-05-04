@@ -28,48 +28,40 @@ export const formatRelativeTime = (date: Date): string => {
   return `Due in ${Math.floor(diffDays / 30)} months`;
 };
 
-// Generate quiz questions from vocabulary
+// Build a definition→term multiple-choice question with 3 distractor terms
+// drawn from the supplied pool (excluding the target vocab).
+const buildMultipleChoice = (
+  vocab: Vocabulary,
+  pool: Vocabulary[],
+  index: number
+): QuizQuestion => {
+  const distractors = pool
+    .filter((v) => v.id !== vocab.id)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3)
+    .map((v) => v.term);
+
+  const options = [vocab.term, ...distractors].sort(() => Math.random() - 0.5);
+
+  return {
+    id: `q-${index}`,
+    vocabId: vocab.id,
+    type: 'multiple_choice',
+    question: `What term matches this definition?\n\n"${vocab.definition}"`,
+    options,
+    correctAnswer: vocab.term,
+  };
+};
+
+// Generate quiz questions from vocabulary. MCQ-only: every question shows a
+// definition and asks the user to pick the matching term from 4 options.
 export const generateQuizQuestions = (
   vocabularies: Vocabulary[],
   count: number = 10
 ): QuizQuestion[] => {
   const shuffled = [...vocabularies].sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, Math.min(count, vocabularies.length));
-
-  return selected.map((vocab, index) => {
-    const isMultipleChoice = Math.random() > 0.3; // 70% multiple choice
-
-    if (isMultipleChoice) {
-      // Generate wrong answers from other vocabularies
-      const wrongAnswers = shuffled
-        .filter((v) => v.id !== vocab.id)
-        .slice(0, 3)
-        .map((v) => v.term);
-
-      const options = [vocab.term, ...wrongAnswers].sort(() => Math.random() - 0.5);
-
-      return {
-        id: `q-${index}`,
-        vocabId: vocab.id,
-        type: 'multiple_choice' as const,
-        question: `What term matches this definition?\n\n"${vocab.definition}"`,
-        options,
-        correctAnswer: vocab.term,
-      };
-    }
-
-    // Fill in the blank
-    const words = vocab.definition.split(' ');
-    const keywordIndex = Math.floor(Math.random() * words.length);
-
-    return {
-      id: `q-${index}`,
-      vocabId: vocab.id,
-      type: 'fill_blank' as const,
-      question: `Complete the definition of "${vocab.term}":\n\n${vocab.definition.substring(0, 50)}...`,
-      correctAnswer: vocab.term,
-    };
-  });
+  return selected.map((vocab, index) => buildMultipleChoice(vocab, shuffled, index));
 };
 
 // Shuffle array

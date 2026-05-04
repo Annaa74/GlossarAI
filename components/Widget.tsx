@@ -124,8 +124,7 @@ const WordOfTheDayContent: React.FC<{ size: WidgetSize; icon: string }> = ({ siz
 };
 
 const StreakContent: React.FC<{ size: WidgetSize; icon: string }> = ({ size, icon }) => {
-  const { user } = useUserStore();
-  const streak = user?.streak ?? 0;
+  const streak = useUserStore((s) => s.user?.streak ?? 0);
 
   return (
     <View style={styles.contentColumn}>
@@ -161,8 +160,9 @@ const DailyGoalContent: React.FC<{ size: WidgetSize; icon: string }> = ({ size, 
 };
 
 const DueCardsContent: React.FC<{ size: WidgetSize; icon: string }> = ({ size, icon }) => {
-  const { currentCards } = useVocabStore();
-  const due = currentCards.length;
+  // Selector returns a primitive — only re-renders when the number changes,
+  // not on every swipe-related mutation of currentCards.
+  const due = useVocabStore((s) => s.currentCards.length);
 
   return (
     <View style={styles.contentColumn}>
@@ -176,11 +176,14 @@ const DueCardsContent: React.FC<{ size: WidgetSize; icon: string }> = ({ size, i
 };
 
 const CategorySpotlightContent: React.FC<{ size: WidgetSize; icon: string }> = ({ size, icon }) => {
-  const { vocabularies } = useVocabStore();
+  const vocabularies = useVocabStore((s) => s.vocabularies);
   const today = new Date();
   const idx = (today.getDate() + today.getMonth()) % CATEGORIES.length;
   const cat = CATEGORIES[idx];
-  const count = vocabularies.filter((v) => v.category === cat.id).length;
+  const count = useMemo(
+    () => vocabularies.filter((v) => v.category === cat.id).length,
+    [vocabularies, cat.id]
+  );
 
   return (
     <View style={styles.contentColumn}>
@@ -214,8 +217,8 @@ const DiscoverWidget: React.FC<{
   icon: string;
   bg: string;
 }> = ({ config, icon, bg }) => {
-  const { vocabularies } = useVocabStore();
-  const { recentlyAdded } = useGrowthStore();
+  const vocabularies = useVocabStore((s) => s.vocabularies);
+  const recentlyAdded = useGrowthStore((s) => s.recentlyAdded);
   const [seed, setSeed] = useState(0);
 
   const recentIds = useMemo(() => {

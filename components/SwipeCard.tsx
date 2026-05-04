@@ -1,13 +1,16 @@
 import React from 'react';
-import { View, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Vocabulary } from '../types';
 import { getCategoryColor, DIFFICULTY_LABELS, DIFFICULTY_COLORS } from '../constants/categories';
 import { NEO, BRUTAL, BRUTAL_SHADOW_LG } from '../constants/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - 32;
-const CARD_HEIGHT_DEFAULT = 440;
+// Sensible fallback used during the first render before the deck region's
+// onLayout has fired. Approximates "screen minus header strip and tab bar"
+// so the card doesn't render small and leave a big gap above it.
+const CARD_HEIGHT_DEFAULT = Math.max(360, SCREEN_HEIGHT - 260);
 
 interface SwipeCardProps {
   vocab: Vocabulary;
@@ -35,25 +38,25 @@ const SwipeCardImpl: React.FC<SwipeCardProps> = ({ vocab, height }) => {
         </View>
 
         <View style={styles.termWrap}>
-          <Text style={styles.term} numberOfLines={2} adjustsFontSizeToFit>
+          <Text style={styles.term} numberOfLines={2}>
             {vocab.term}
           </Text>
         </View>
 
-        <ScrollView
-          style={styles.body}
-          contentContainerStyle={styles.bodyContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.body}>
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>DEFINITION</Text>
-            <Text style={styles.definition}>{vocab.definition}</Text>
+            <Text style={styles.definition} numberOfLines={5}>
+              {vocab.definition}
+            </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>EXAMPLE</Text>
             <View style={[styles.exampleBox, { backgroundColor: categoryColor }]}>
-              <Text style={styles.example}>{vocab.example}</Text>
+              <Text style={styles.example} numberOfLines={4}>
+                {vocab.example}
+              </Text>
             </View>
           </View>
 
@@ -69,7 +72,7 @@ const SwipeCardImpl: React.FC<SwipeCardProps> = ({ vocab, height }) => {
               </View>
             </View>
           )}
-        </ScrollView>
+        </View>
       </View>
     </View>
   );
@@ -142,10 +145,8 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-  },
-  bodyContent: {
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingBottom: 14,
     gap: 12,
   },
   section: {},
@@ -161,7 +162,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: NEO.ink,
     fontWeight: '500',
-    textAlign: 'justify',
+    textAlign: 'left',
   },
   exampleBox: {
     padding: 10,
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: NEO.ink,
     fontWeight: '600',
-    textAlign: 'justify',
+    textAlign: 'left',
   },
   relatedRow: {
     flexDirection: 'row',

@@ -4,32 +4,50 @@ import { useUserStore } from '../stores/userStore';
 import { UserProgress, SwipeDirection } from '../types';
 import { getMasteryLevel, isDueForReview, getUrgencyLevel } from '../services/srs';
 
-export const useSpacedRepetition = () => {
-  const { userProgress, currentCards, processSwipe, fetchUserProgress } = useVocabStore();
-  const { user, updateStreak } = useUserStore();
+/**
+ * Lightweight hook for the swipe hot path. Subscribes only to stable action
+ * refs so the consuming component doesn't re-render every time userProgress
+ * or currentCards change mid-swipe.
+ */
+export const useSwipeHandler = () => {
+  const userId = useUserStore((s) => s.user?.id);
+  const processSwipe = useVocabStore((s) => s.processSwipe);
+  const updateStreak = useUserStore((s) => s.updateStreak);
 
-  // Handle card swipe
   const handleSwipe = useCallback(
-    async (vocabId: string, direction: SwipeDirection) => {
-      if (!user?.id) return;
-
-      await processSwipe(user.id, vocabId, direction);
-
-      // Update streak after reviewing a card
-      await updateStreak();
+    (vocabId: string, direction: SwipeDirection) => {
+      if (!userId) return;
+      // Fire-and-forget: don't block the UI thread on Firestore. processSwipe
+      // updates local state synchronously before its await, so the next card
+      // is ready instantly.
+      void processSwipe(userId, vocabId, direction);
+      // updateStreak is a same-day no-op once we've updated today, so it's
+      // cheap to call here. Still don't await it — keep the swipe path sync.
+      void updateStreak();
     },
-    [user?.id, processSwipe, updateStreak]
+    [userId, processSwipe, updateStreak]
   );
 
-  // Get progress for a specific card
+  return { handleSwipe };
+};
+
+/**
+ * Full SRS hook with derived stats. Use this on screens that surface progress
+ * data (e.g. progress screen) — NOT on the home screen swipe path, where it
+ * would re-run on every userProgress change.
+ */
+export const useSpacedRepetition = () => {
+  const userProgress = useVocabStore((s) => s.userProgress);
+  const currentCards = useVocabStore((s) => s.currentCards);
+  const fetchUserProgress = useVocabStore((s) => s.fetchUserProgress);
+  const userId = useUserStore((s) => s.user?.id);
+  const { handleSwipe } = useSwipeHandler();
+
   const getCardProgress = useCallback(
-    (vocabId: string): UserProgress | null => {
-      return userProgress.get(vocabId) || null;
-    },
+    (vocabId: string): UserProgress | null => userProgress.get(vocabId) || null,
     [userProgress]
   );
 
-  // Get mastery level for a card
   const getCardMasteryLevel = useCallback(
     (vocabId: string) => {
       const progress = userProgress.get(vocabId);
@@ -39,24 +57,16 @@ export const useSpacedRepetition = () => {
     [userProgress]
   );
 
-  // Get cards due for review
   const dueCards = useMemo(() => {
     const due: { vocabId: string; urgency: number }[] = [];
-
     userProgress.forEach((progress, vocabId) => {
       if (isDueForReview(progress)) {
-        due.push({
-          vocabId,
-          urgency: getUrgencyLevel(progress),
-        });
+        due.push({ vocabId, urgency: getUrgencyLevel(progress) });
       }
     });
-
-    // Sort by urgency (most overdue first)
     return due.sort((a, b) => b.urgency - a.urgency);
   }, [userProgress]);
 
-  // Get statistics
   const stats = useMemo(() => {
     let total = 0;
     let known = 0;
@@ -67,7 +77,6 @@ export const useSpacedRepetition = () => {
       total++;
       if (progress.status === 'known') known++;
       else if (progress.status === 'learning') learning++;
-
       if (isDueForReview(progress)) dueCount++;
     });
 
@@ -77,25 +86,18 @@ export const useSpacedRepetition = () => {
       learning,
       new: currentCards.length - total,
       dueCount,
-      reviewedToday: 0, // TODO: Track daily reviews
+      reviewedToday: 0,
     };
   }, [userProgress, currentCards]);
 
-  // Get next review time for a card
   const getNextReviewTime = useCallback(
-    (vocabId: string): Date | null => {
-      const progress = userProgress.get(vocabId);
-      return progress?.nextReviewDate || null;
-    },
+    (vocabId: string): Date | null => userProgress.get(vocabId)?.nextReviewDate || null,
     [userProgress]
   );
 
-  // Refresh user progress
   const refreshProgress = useCallback(async () => {
-    if (user?.id) {
-      await fetchUserProgress(user.id);
-    }
-  }, [user?.id, fetchUserProgress]);
+    if (userId) await fetchUserProgress(userId);
+  }, [userId, fetchUserProgress]);
 
   return {
     handleSwipe,

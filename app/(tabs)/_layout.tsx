@@ -77,10 +77,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="widgets"
+        name="favorites"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="widgets-outline" color={color} focused={focused} />
+            <TabIcon name={focused ? 'heart' : 'heart-outline'} color={color} focused={focused} />
           ),
         }}
       />
