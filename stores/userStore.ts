@@ -5,6 +5,14 @@ import { User } from '../types';
 import * as authService from '../services/auth';
 import { calculateStreak } from '../services/srs';
 import { useVocabStore } from './vocabStore';
+import { reportError, trackEvent, AuthEvents } from '../services/observability';
+
+// Pull a Firebase auth error code off an unknown thrown value so we can tag
+// analytics events with WHY a flow failed without leaking the raw message.
+const codeOf = (err: unknown): string | undefined =>
+  err && typeof err === 'object' && 'code' in err
+    ? String((err as { code: unknown }).code ?? '')
+    : undefined;
 
 // Run once after a successful signUp / signIn from any provider. If the
 // previous session was a guest, push their local data to Firestore. Always
@@ -52,14 +60,17 @@ export const useUserStore = create<UserState>()(
       signIn: async (email: string, password: string) => {
         const priorWasGuest = !!get().user?.id?.startsWith('guest-');
         set({ isLoading: true, error: null });
+        trackEvent(AuthEvents.SigninStarted);
         try {
           const user = await authService.signIn(email, password);
           set({ user, isAuthenticated: true, isLoading: false });
+          trackEvent(AuthEvents.SigninCompleted, { priorWasGuest });
           // Fire-and-forget — don't block the UI on the migration / hydration.
-          // Errors are already logged inside vocabStore.
           handlePostAuth(priorWasGuest, user.id).catch(() => {});
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error), isLoading: false });
+          reportError(error, { op: 'signIn' });
+          trackEvent(AuthEvents.SigninFailed, { code: codeOf(error) });
           throw error;
         }
       },
@@ -67,12 +78,16 @@ export const useUserStore = create<UserState>()(
       signUp: async (email: string, password: string, displayName: string) => {
         const priorWasGuest = !!get().user?.id?.startsWith('guest-');
         set({ isLoading: true, error: null });
+        trackEvent(AuthEvents.SignupStarted);
         try {
           const user = await authService.signUp(email, password, displayName);
           set({ user, isAuthenticated: true, isLoading: false });
+          trackEvent(AuthEvents.SignupCompleted, { priorWasGuest });
           handlePostAuth(priorWasGuest, user.id).catch(() => {});
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error), isLoading: false });
+          reportError(error, { op: 'signUp' });
+          trackEvent(AuthEvents.SignupFailed, { code: codeOf(error) });
           throw error;
         }
       },
@@ -83,9 +98,12 @@ export const useUserStore = create<UserState>()(
         try {
           const user = await authService.signInWithGoogleIdToken(idToken);
           set({ user, isAuthenticated: true, isLoading: false });
+          trackEvent(AuthEvents.GoogleSigninCompleted, { priorWasGuest });
           handlePostAuth(priorWasGuest, user.id).catch(() => {});
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error), isLoading: false });
+          reportError(error, { op: 'signInWithGoogle' });
+          trackEvent(AuthEvents.GoogleSigninFailed, { code: codeOf(error) });
           throw error;
         }
       },
@@ -107,12 +125,16 @@ export const useUserStore = create<UserState>()(
           // Guests have no Firebase record — just clear local state.
           if (user?.id?.startsWith('guest-')) {
             set({ user: null, isAuthenticated: false, isLoading: false });
+            trackEvent(AuthEvents.AccountDeleted, { guest: true });
             return;
           }
           await authService.deleteAccount(currentPassword);
           set({ user: null, isAuthenticated: false, isLoading: false });
+          trackEvent(AuthEvents.AccountDeleted, { guest: false });
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error), isLoading: false });
+          reportError(error, { op: 'deleteAccount' });
+          trackEvent(AuthEvents.AccountDeletionFailed, { code: codeOf(error) });
           throw error;
         }
       },
@@ -121,8 +143,11 @@ export const useUserStore = create<UserState>()(
         set({ error: null });
         try {
           await authService.sendPasswordReset(email);
+          trackEvent(AuthEvents.PasswordResetSent);
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error) });
+          reportError(error, { op: 'sendPasswordReset' });
+          trackEvent(AuthEvents.PasswordResetFailed, { code: codeOf(error) });
           throw error;
         }
       },
@@ -135,18 +160,28 @@ export const useUserStore = create<UserState>()(
         set({ error: null });
         try {
           await authService.resendVerificationEmail();
+          trackEvent(AuthEvents.EmailVerificationResent);
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error) });
+          reportError(error, { op: 'resendVerificationEmail' });
           throw error;
         }
       },
 
       reloadAuthUser: async () => {
         try {
+          const wasVerified = !!get().user?.emailVerified;
           const refreshed = await authService.reloadAuthUser();
-          if (refreshed) set({ user: refreshed });
+          if (refreshed) {
+            set({ user: refreshed });
+            // Catch the verification flip so the funnel sees it.
+            if (!wasVerified && refreshed.emailVerified) {
+              trackEvent(AuthEvents.EmailVerified);
+            }
+          }
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error) });
+          reportError(error, { op: 'reloadAuthUser' });
         }
       },
 
@@ -154,8 +189,10 @@ export const useUserStore = create<UserState>()(
         set({ error: null });
         try {
           await authService.updateUserPassword(currentPassword, newPassword);
+          trackEvent(AuthEvents.PasswordChanged);
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error) });
+          reportError(error, { op: 'updatePassword' });
           throw error;
         }
       },
@@ -164,8 +201,10 @@ export const useUserStore = create<UserState>()(
         set({ error: null });
         try {
           await authService.updateUserEmail(currentPassword, newEmail);
+          trackEvent(AuthEvents.EmailChangeRequested);
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error) });
+          reportError(error, { op: 'updateEmail' });
           throw error;
         }
       },
@@ -177,8 +216,10 @@ export const useUserStore = create<UserState>()(
           // Mirror the change locally so the UI reflects it instantly.
           const { user } = get();
           if (user) set({ user: { ...user, displayName } });
+          trackEvent(AuthEvents.DisplayNameChanged);
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error) });
+          reportError(error, { op: 'updateDisplayName' });
           throw error;
         }
       },
