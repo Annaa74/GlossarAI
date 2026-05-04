@@ -170,6 +170,23 @@ export const getCardsForReview = async (
   });
 };
 
+// Pull the user's favorites list (vocab IDs) from their profile doc.
+// Returns [] if the field is unset or the doc doesn't exist yet.
+export const getRemoteFavorites = async (userId: string): Promise<string[]> => {
+  const docRef = doc(db, 'users', userId);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) return [];
+  const data = snap.data();
+  return Array.isArray(data.favorites) ? (data.favorites as string[]) : [];
+};
+
+// Replace the user's favorites array with the given set of IDs. Uses merge
+// so other profile fields are preserved.
+export const setRemoteFavorites = async (userId: string, favoriteIds: string[]): Promise<void> => {
+  const docRef = doc(db, 'users', userId);
+  await setDoc(docRef, { favorites: favoriteIds }, { merge: true });
+};
+
 // Get category statistics
 export const getCategoryStats = async (
   userId: string

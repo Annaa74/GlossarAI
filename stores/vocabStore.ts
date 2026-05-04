@@ -35,6 +35,18 @@ interface VocabState {
   setSelectedCategory: (category: VocabCategory | 'all') => void;
   getCategoryProgress: (userId: string) => Promise<void>;
   getVocabById: (id: string) => Vocabulary | undefined;
+  /**
+   * Push every locally-accumulated favorite + progress entry to Firestore.
+   * Called on guest → registered transition so the user's offline activity
+   * survives into their cloud profile. Cloud-side existing data is merged
+   * (union for favorites; per-card overwrite for progress).
+   */
+  migrateGuestDataToCloud: (userId: string) => Promise<void>;
+  /**
+   * Read the user's favorites list from Firestore and merge it into the
+   * local Set. Idempotent — safe to call on every sign-in.
+   */
+  hydrateFavoritesFromRemote: (userId: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -188,6 +200,45 @@ export const useVocabStore = create<VocabState>()(
         }
 
         set({ favorites: newFavorites });
+      },
+
+      migrateGuestDataToCloud: async (userId: string) => {
+        if (userId.startsWith('guest-')) return;
+        const { favorites, userProgress } = get();
+
+        // Favorites — union local with whatever already exists on the cloud
+        // doc, so signing in to an existing account doesn't wipe its saves.
+        try {
+          const remote = await vocabService.getRemoteFavorites(userId);
+          const merged = Array.from(new Set([...remote, ...Array.from(favorites)]));
+          if (merged.length > 0) await vocabService.setRemoteFavorites(userId, merged);
+        } catch (error) {
+          console.error('[migrate] favorites push failed:', error);
+        }
+
+        // Progress — push each local entry. Per-card setDoc overwrites the
+        // remote progress for that card, which is the right thing for a guest
+        // who's been actively studying: their fresher progress wins.
+        const writes = Array.from(userProgress.values()).map((p) =>
+          vocabService.updateUserProgress(userId, p).catch((err) => {
+            console.error('[migrate] progress push failed for', p.vocabId, err);
+          })
+        );
+        await Promise.all(writes);
+      },
+
+      hydrateFavoritesFromRemote: async (userId: string) => {
+        if (userId.startsWith('guest-')) return;
+        try {
+          const remote = await vocabService.getRemoteFavorites(userId);
+          if (remote.length === 0) return;
+          const { favorites } = get();
+          const merged = new Set(favorites);
+          remote.forEach((id) => merged.add(id));
+          set({ favorites: merged });
+        } catch (error) {
+          console.error('[hydrate] favorites fetch failed:', error);
+        }
       },
 
       setSelectedCategory: (category: VocabCategory | 'all') => {

@@ -12,6 +12,8 @@ import {
   EmailAuthProvider,
   sendPasswordResetEmail,
   sendEmailVerification,
+  updatePassword,
+  verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
@@ -269,6 +271,47 @@ export const reloadAuthUser = async (): Promise<User | null> => {
   if (!firebaseUser) return null;
   await firebaseUser.reload();
   return getCurrentUser();
+};
+
+// Reauthenticate the current email/password user. Required before any
+// sensitive operation per Firebase's recent-login policy.
+const reauth = async (currentPassword: string): Promise<FirebaseUser> => {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) throw new Error('You are not signed in.');
+  if (!firebaseUser.email) {
+    throw new Error('This account has no email and cannot be modified from the app.');
+  }
+  const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword);
+  await reauthenticateWithCredential(firebaseUser, credential);
+  return firebaseUser;
+};
+
+// Change the current user's password. Requires their current password to
+// satisfy Firebase's recent-login requirement.
+export const updateUserPassword = async (
+  currentPassword: string,
+  newPassword: string
+): Promise<void> => {
+  const firebaseUser = await reauth(currentPassword);
+  await updatePassword(firebaseUser, newPassword);
+};
+
+// Change the current user's email. Sends a verification link to the NEW
+// address; the email actually changes on the auth record only after the
+// user clicks that link. (verifyBeforeUpdateEmail vs the deprecated
+// updateEmail — the latter is blocked for security on most projects.)
+export const updateUserEmail = async (currentPassword: string, newEmail: string): Promise<void> => {
+  const firebaseUser = await reauth(currentPassword);
+  await verifyBeforeUpdateEmail(firebaseUser, newEmail);
+};
+
+// Update displayName on both Firebase Auth and the Firestore profile doc.
+// No reauth needed — this is a non-sensitive change.
+export const updateUserDisplayName = async (displayName: string): Promise<void> => {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) throw new Error('You are not signed in.');
+  await updateProfile(firebaseUser, { displayName });
+  await setDoc(doc(db, 'users', firebaseUser.uid), { displayName }, { merge: true });
 };
 
 // Subscribe to auth state changes

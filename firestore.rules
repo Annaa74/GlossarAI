@@ -23,14 +23,15 @@ service cloud.firestore {
         && request.resource.data.displayName is string;
 
       // Update: owner only. Identity fields are immutable; only profile/state
-      // fields may change.
+      // fields may change. `favorites` is a flat array of vocab IDs the user
+      // has saved — see services/vocabulary.ts setRemoteFavorites.
       allow update: if isOwner(userId)
         && request.resource.data.id == resource.data.id
         && request.resource.data.email == resource.data.email
         && request.resource.data.createdAt == resource.data.createdAt
         // Allowed mutable fields:
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['streak', 'lastStudyDate', 'displayName', 'notificationSettings']);
+             .hasOnly(['streak', 'lastStudyDate', 'displayName', 'notificationSettings', 'favorites']);
 
       // Delete: owner only. Required by Apple App Store (Guideline 5.1.1(v))
       // for any app with sign-up to support self-service account deletion.

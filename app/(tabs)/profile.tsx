@@ -15,8 +15,18 @@ import { useUserStore } from '../../stores/userStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useNotifications } from '../../hooks';
 
+type EditField = 'displayName' | 'email' | 'password' | null;
+
 export default function ProfileScreen() {
-  const { user, isAuthenticated, signOut, deleteAccount } = useUserStore();
+  const {
+    user,
+    isAuthenticated,
+    signOut,
+    deleteAccount,
+    updateDisplayName,
+    updateEmail,
+    updatePassword,
+  } = useUserStore();
   const c = useThemedColors();
   const {
     settings,
@@ -35,6 +45,16 @@ export default function ProfileScreen() {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Account self-service edit dialog. One dialog reused for all three fields
+  // — the active `field` decides which inputs render and which action runs.
+  const [editField, setEditField] = useState<EditField>(null);
+  const [editValue, setEditValue] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editConfirm, setEditConfirm] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editSuccess, setEditSuccess] = useState<string | null>(null);
 
   const isGuest = !!user?.id?.startsWith('guest-');
 
@@ -61,6 +81,79 @@ export default function ProfileScreen() {
     setDeletePassword('');
     setDeleteError(null);
     setShowDeleteDialog(true);
+  };
+
+  const openEdit = (field: Exclude<EditField, null>) => {
+    setEditField(field);
+    setEditValue(field === 'displayName' ? (user?.displayName ?? '') : '');
+    setEditPassword('');
+    setEditConfirm('');
+    setEditError(null);
+    setEditSuccess(null);
+  };
+
+  const closeEdit = () => {
+    if (editBusy) return;
+    setEditField(null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editField) return;
+    setEditError(null);
+
+    // Per-field validation.
+    if (editField === 'displayName') {
+      const name = editValue.trim();
+      if (name.length < 2) {
+        setEditError('Name must be at least 2 characters.');
+        return;
+      }
+    } else if (editField === 'email') {
+      const email = editValue.trim();
+      if (!email.includes('@')) {
+        setEditError('Enter a valid email address.');
+        return;
+      }
+      if (!editPassword) {
+        setEditError('Enter your current password to confirm.');
+        return;
+      }
+    } else if (editField === 'password') {
+      if (!editPassword) {
+        setEditError('Enter your current password.');
+        return;
+      }
+      if (editValue.length < 8 || !/\d/.test(editValue)) {
+        setEditError('New password must be 8+ characters with a number.');
+        return;
+      }
+      if (editValue !== editConfirm) {
+        setEditError('New passwords do not match.');
+        return;
+      }
+    }
+
+    setEditBusy(true);
+    try {
+      if (editField === 'displayName') {
+        await updateDisplayName(editValue.trim());
+        setEditSuccess('Name updated.');
+      } else if (editField === 'email') {
+        await updateEmail(editPassword, editValue.trim());
+        setEditSuccess(
+          'Verification link sent to the new address. Email changes take effect after you click it.'
+        );
+      } else if (editField === 'password') {
+        await updatePassword(editPassword, editValue);
+        setEditSuccess('Password updated.');
+      }
+      // Auto-close after a brief moment so the user sees the confirmation.
+      setTimeout(() => setEditField(null), 1500);
+    } catch {
+      setEditError(useUserStore.getState().error ?? 'Could not save changes.');
+    } finally {
+      setEditBusy(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -159,6 +252,33 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {!isGuest && (
+          <View style={styles.settingsCard}>
+            <Text style={styles.sectionTitle}>ACCOUNT</Text>
+            <SettingRow
+              icon="account-edit"
+              title="Display name"
+              subtitle={user?.displayName ?? '—'}
+              onPress={() => openEdit('displayName')}
+              chevron
+            />
+            <SettingRow
+              icon="email-edit"
+              title="Email"
+              subtitle={user?.email ?? '—'}
+              onPress={() => openEdit('email')}
+              chevron
+            />
+            <SettingRow
+              icon="lock-reset"
+              title="Password"
+              subtitle="CHANGE PASSWORD"
+              onPress={() => openEdit('password')}
+              chevron
+            />
+          </View>
+        )}
+
         <View style={styles.settingsCard}>
           <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
           <SettingRow
@@ -242,6 +362,134 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <Portal>
+        <Dialog visible={editField !== null} onDismiss={closeEdit}>
+          <Dialog.Title>
+            {editField === 'displayName'
+              ? 'Edit name'
+              : editField === 'email'
+                ? 'Change email'
+                : 'Change password'}
+          </Dialog.Title>
+          <Dialog.Content>
+            {editField === 'displayName' && (
+              <TextInput
+                label="Display name"
+                value={editValue}
+                onChangeText={(t) => {
+                  setEditValue(t);
+                  setEditError(null);
+                }}
+                mode="outlined"
+                outlineColor={NEO.ink}
+                activeOutlineColor={NEO.ink}
+                disabled={editBusy}
+              />
+            )}
+            {editField === 'email' && (
+              <>
+                <TextInput
+                  label="New email"
+                  value={editValue}
+                  onChangeText={(t) => {
+                    setEditValue(t);
+                    setEditError(null);
+                  }}
+                  mode="outlined"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  outlineColor={NEO.ink}
+                  activeOutlineColor={NEO.ink}
+                  disabled={editBusy}
+                />
+                <TextInput
+                  label="Current password"
+                  value={editPassword}
+                  onChangeText={(t) => {
+                    setEditPassword(t);
+                    setEditError(null);
+                  }}
+                  mode="outlined"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  style={{ marginTop: 8 }}
+                  outlineColor={NEO.ink}
+                  activeOutlineColor={NEO.ink}
+                  disabled={editBusy}
+                />
+              </>
+            )}
+            {editField === 'password' && (
+              <>
+                <TextInput
+                  label="Current password"
+                  value={editPassword}
+                  onChangeText={(t) => {
+                    setEditPassword(t);
+                    setEditError(null);
+                  }}
+                  mode="outlined"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  outlineColor={NEO.ink}
+                  activeOutlineColor={NEO.ink}
+                  disabled={editBusy}
+                />
+                <TextInput
+                  label="New password"
+                  value={editValue}
+                  onChangeText={(t) => {
+                    setEditValue(t);
+                    setEditError(null);
+                  }}
+                  mode="outlined"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  style={{ marginTop: 8 }}
+                  outlineColor={NEO.ink}
+                  activeOutlineColor={NEO.ink}
+                  disabled={editBusy}
+                />
+                <TextInput
+                  label="Confirm new password"
+                  value={editConfirm}
+                  onChangeText={(t) => {
+                    setEditConfirm(t);
+                    setEditError(null);
+                  }}
+                  mode="outlined"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  style={{ marginTop: 8 }}
+                  outlineColor={NEO.ink}
+                  activeOutlineColor={NEO.ink}
+                  disabled={editBusy}
+                />
+              </>
+            )}
+            {editError && (
+              <Text style={{ color: NEO.red, marginTop: 10, fontWeight: '700' }}>{editError}</Text>
+            )}
+            {editSuccess && (
+              <Text style={{ color: NEO.ink, marginTop: 10, fontWeight: '700' }}>
+                {editSuccess}
+              </Text>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={closeEdit} textColor={NEO.ink} disabled={editBusy}>
+              Cancel
+            </Button>
+            <Button
+              onPress={handleEditSave}
+              textColor={NEO.ink}
+              loading={editBusy}
+              disabled={editBusy}
+            >
+              Save
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
         <Dialog visible={showTimeDialog} onDismiss={() => setShowTimeDialog(false)}>
           <Dialog.Title>Set Reminder Time</Dialog.Title>
           <Dialog.Content>

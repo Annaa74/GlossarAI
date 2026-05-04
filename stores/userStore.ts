@@ -4,6 +4,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
 import * as authService from '../services/auth';
 import { calculateStreak } from '../services/srs';
+import { useVocabStore } from './vocabStore';
+
+// Run once after a successful signUp / signIn from any provider. If the
+// previous session was a guest, push their local data to Firestore. Always
+// hydrate cloud-side favorites afterward so the local Set reflects what's
+// in the user's profile across devices.
+const handlePostAuth = async (priorWasGuest: boolean, userId: string): Promise<void> => {
+  const vocab = useVocabStore.getState();
+  if (priorWasGuest) {
+    await vocab.migrateGuestDataToCloud(userId);
+  }
+  await vocab.hydrateFavoritesFromRemote(userId);
+};
 
 interface UserState {
   user: User | null;
@@ -22,6 +35,9 @@ interface UserState {
   updateStreak: () => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
   reloadAuthUser: () => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  updateEmail: (currentPassword: string, newEmail: string) => Promise<void>;
+  updateDisplayName: (displayName: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -34,10 +50,14 @@ export const useUserStore = create<UserState>()(
       error: null,
 
       signIn: async (email: string, password: string) => {
+        const priorWasGuest = !!get().user?.id?.startsWith('guest-');
         set({ isLoading: true, error: null });
         try {
           const user = await authService.signIn(email, password);
           set({ user, isAuthenticated: true, isLoading: false });
+          // Fire-and-forget — don't block the UI on the migration / hydration.
+          // Errors are already logged inside vocabStore.
+          handlePostAuth(priorWasGuest, user.id).catch(() => {});
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error), isLoading: false });
           throw error;
@@ -45,10 +65,12 @@ export const useUserStore = create<UserState>()(
       },
 
       signUp: async (email: string, password: string, displayName: string) => {
+        const priorWasGuest = !!get().user?.id?.startsWith('guest-');
         set({ isLoading: true, error: null });
         try {
           const user = await authService.signUp(email, password, displayName);
           set({ user, isAuthenticated: true, isLoading: false });
+          handlePostAuth(priorWasGuest, user.id).catch(() => {});
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error), isLoading: false });
           throw error;
@@ -56,10 +78,12 @@ export const useUserStore = create<UserState>()(
       },
 
       signInWithGoogle: async (idToken: string) => {
+        const priorWasGuest = !!get().user?.id?.startsWith('guest-');
         set({ isLoading: true, error: null });
         try {
           const user = await authService.signInWithGoogleIdToken(idToken);
           set({ user, isAuthenticated: true, isLoading: false });
+          handlePostAuth(priorWasGuest, user.id).catch(() => {});
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error), isLoading: false });
           throw error;
@@ -123,6 +147,39 @@ export const useUserStore = create<UserState>()(
           if (refreshed) set({ user: refreshed });
         } catch (error: unknown) {
           set({ error: authService.mapAuthError(error) });
+        }
+      },
+
+      updatePassword: async (currentPassword: string, newPassword: string) => {
+        set({ error: null });
+        try {
+          await authService.updateUserPassword(currentPassword, newPassword);
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error) });
+          throw error;
+        }
+      },
+
+      updateEmail: async (currentPassword: string, newEmail: string) => {
+        set({ error: null });
+        try {
+          await authService.updateUserEmail(currentPassword, newEmail);
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error) });
+          throw error;
+        }
+      },
+
+      updateDisplayName: async (displayName: string) => {
+        set({ error: null });
+        try {
+          await authService.updateUserDisplayName(displayName);
+          // Mirror the change locally so the UI reflects it instantly.
+          const { user } = get();
+          if (user) set({ user: { ...user, displayName } });
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error) });
+          throw error;
         }
       },
 
