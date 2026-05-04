@@ -20,6 +20,27 @@ let db: Firestore;
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
 
+  // Make it impossible to confuse dev and prod by accident — log the
+  // connected projectId so a quick glance at Metro tells you which Firebase
+  // project the running app is wired to. For per-environment isolation use
+  // separate Firebase projects (recommended) and swap the EXPO_PUBLIC_*
+  // variables via .env.{development,production} files locally or EAS
+  // secrets per channel for hosted builds. See .env.example.
+  const projectId = firebaseConfig.projectId;
+  if (!projectId || projectId === 'your-project-id') {
+    console.warn(
+      '[firebase] EXPO_PUBLIC_FIREBASE_PROJECT_ID is not set. Running in offline / guest-only mode.'
+    );
+  } else {
+    console.info(`[firebase] connected to project: ${projectId}`);
+  }
+
+  // App Check note: the firebase JS SDK's App Check (recaptcha v3) does not
+  // enforce Play Integrity / App Attest on React Native — those require the
+  // native @react-native-firebase/app-check module. If you need App Check on
+  // device, switch to react-native-firebase and wire it before flipping
+  // `request.app != null` requirements in firestore.rules.
+
   // Persist the auth session in AsyncStorage so users stay signed in across
   // cold starts. Without this the Firebase JS SDK defaults to in-memory
   // persistence on React Native and effectively logs the user out every

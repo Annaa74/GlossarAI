@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, SafeAreaView, Alert, Pressable } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  Alert,
+  Pressable,
+  Linking,
+  Share,
+} from 'react-native';
 import { Text, Button, Switch, Avatar, Portal, Dialog, TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -14,6 +23,7 @@ import {
 import { useUserStore } from '../../stores/userStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useNotifications } from '../../hooks';
+import { exportUserDataJson } from '../../services/dataExport';
 
 type EditField = 'displayName' | 'email' | 'password' | null;
 
@@ -57,6 +67,39 @@ export default function ProfileScreen() {
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
 
   const isGuest = !!user?.id?.startsWith('guest-');
+
+  // External URLs are env-driven — set EXPO_PUBLIC_PRIVACY_POLICY_URL and
+  // EXPO_PUBLIC_TERMS_OF_SERVICE_URL to your hosted pages. Rows are disabled
+  // when unset so we never link to a placeholder.
+  const privacyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL;
+  const termsUrl = process.env.EXPO_PUBLIC_TERMS_OF_SERVICE_URL;
+
+  const openExternalUrl = async (url?: string) => {
+    if (!url) return;
+    try {
+      await Linking.openURL(url);
+    } catch (e) {
+      Alert.alert('Could not open link', 'Try copying the URL manually.');
+    }
+  };
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportData = async () => {
+    if (!user?.id || isExporting) return;
+    setIsExporting(true);
+    try {
+      const json = await exportUserDataJson(user.id);
+      await Share.share({
+        title: 'GlosserAI data export',
+        message: json,
+      });
+    } catch (err) {
+      Alert.alert('Export failed', 'Could not assemble your data right now. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -332,10 +375,36 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.settingsCard}>
+          <Text style={styles.sectionTitle}>YOUR DATA</Text>
+          <SettingRow
+            icon="download"
+            title="Download my data"
+            subtitle={isExporting ? 'PREPARING…' : 'EXPORT AS JSON'}
+            onPress={handleExportData}
+            disabled={isExporting}
+            chevron
+          />
+        </View>
+
+        <View style={styles.settingsCard}>
           <Text style={styles.sectionTitle}>ABOUT</Text>
           <SettingRow icon="information" title="Version" subtitle="1.0.0" />
-          <SettingRow icon="shield-check" title="Privacy Policy" onPress={() => {}} chevron />
-          <SettingRow icon="file-document" title="Terms of Service" onPress={() => {}} chevron />
+          <SettingRow
+            icon="shield-check"
+            title="Privacy Policy"
+            subtitle={privacyUrl ? undefined : 'NOT CONFIGURED'}
+            onPress={privacyUrl ? () => openExternalUrl(privacyUrl) : undefined}
+            disabled={!privacyUrl}
+            chevron={!!privacyUrl}
+          />
+          <SettingRow
+            icon="file-document"
+            title="Terms of Service"
+            subtitle={termsUrl ? undefined : 'NOT CONFIGURED'}
+            onPress={termsUrl ? () => openExternalUrl(termsUrl) : undefined}
+            disabled={!termsUrl}
+            chevron={!!termsUrl}
+          />
         </View>
 
         <Button
