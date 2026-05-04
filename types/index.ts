@@ -31,6 +31,10 @@ export interface User {
   lastStudyDate: Date | null;
   notificationSettings: NotificationSettings;
   createdAt: Date;
+  // Mirrored from FirebaseUser.emailVerified at sign-in / reload time.
+  // Always true for guest users (we don't have a real email to verify) and
+  // for federated providers like Google.
+  emailVerified: boolean;
 }
 
 export interface NotificationSettings {

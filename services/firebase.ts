@@ -1,9 +1,9 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import * as firebaseAuth from 'firebase/auth';
+import { Auth, getAuth, initializeAuth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Firebase configuration
-// Replace these values with your actual Firebase project config
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || 'your-api-key',
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || 'your-project.firebaseapp.com',
@@ -13,18 +13,45 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '1:123456789:web:abcdef',
 };
 
-// Initialize Firebase (prevent re-initialization)
 let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
+
+  // Persist the auth session in AsyncStorage so users stay signed in across
+  // cold starts. Without this the Firebase JS SDK defaults to in-memory
+  // persistence on React Native and effectively logs the user out every
+  // time the app process is killed.
+  //
+  // `getReactNativePersistence` ships in the RN bundle of firebase/auth
+  // (dist/rn/index.js, picked by Metro via the package's "react-native"
+  // field) but isn't in the public TypeScript types — hence the cast.
+  const getReactNativePersistence = (
+    firebaseAuth as unknown as {
+      getReactNativePersistence?: (storage: unknown) => unknown;
+    }
+  ).getReactNativePersistence;
+
+  try {
+    if (getReactNativePersistence) {
+      auth = initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage) as any,
+      });
+    } else {
+      auth = getAuth(app);
+    }
+  } catch (e) {
+    // initializeAuth throws if called twice (hot reload, etc.) — fall back.
+    console.warn('[firebase] initializeAuth failed, using default persistence:', e);
+    auth = getAuth(app);
+  }
 } else {
   app = getApps()[0];
+  auth = getAuth(app);
 }
 
-auth = getAuth(app);
 db = getFirestore(app);
 
 export { app, auth, db };

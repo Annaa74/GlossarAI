@@ -11,10 +11,52 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   sendPasswordResetEmail,
+  sendEmailVerification,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { User } from '../types';
+
+// Map Firebase auth error codes to user-facing copy. Firebase throws errors
+// shaped like { code: 'auth/invalid-credential', message: 'Firebase: Error (auth/...)' }
+// — we never want the raw `message` reaching the UI.
+export const mapAuthError = (err: unknown): string => {
+  const code = (err as { code?: string })?.code ?? '';
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'That email address looks invalid.';
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Email or password is incorrect.';
+    case 'auth/email-already-in-use':
+      return 'An account already exists with that email. Try signing in.';
+    case 'auth/weak-password':
+      return 'Password is too weak. Use at least 8 characters with a number.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Try again in a few minutes.';
+    case 'auth/network-request-failed':
+      return "You're offline. Check your connection and try again.";
+    case 'auth/user-disabled':
+      return 'This account has been disabled.';
+    case 'auth/operation-not-allowed':
+      return 'This sign-in method is not enabled. Contact support.';
+    case 'auth/requires-recent-login':
+      return 'Please sign in again to continue.';
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return 'Sign-in was cancelled.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account already exists with that email under a different sign-in method.';
+    case 'auth/invalid-action-code':
+    case 'auth/expired-action-code':
+      return 'That link has expired or already been used. Request a new one.';
+    default:
+      // Last-resort fallback. We deliberately don't surface err.message here
+      // because Firebase's raw messages leak the SDK internals.
+      return 'Something went wrong. Please try again.';
+  }
+};
 
 // Create a new user account
 export const signUp = async (
@@ -28,7 +70,17 @@ export const signUp = async (
   // Update display name in Firebase Auth
   await updateProfile(firebaseUser, { displayName });
 
-  // Create user document in Firestore
+  // Kick off the verification email. Don't fail signup if this throws (rate
+  // limits, transient network) — the user can resend from the home banner.
+  try {
+    await sendEmailVerification(firebaseUser);
+  } catch (e) {
+    console.warn('[auth] sendEmailVerification on signup failed:', e);
+  }
+
+  // Create user document in Firestore. emailVerified is intentionally NOT
+  // persisted here — it lives on the Firebase Auth record and we read it
+  // fresh on every sign-in / reload.
   const userData: User = {
     id: firebaseUser.uid,
     email: firebaseUser.email || email,
@@ -41,12 +93,17 @@ export const signUp = async (
       frequency: 'daily',
     },
     createdAt: new Date(),
+    emailVerified: firebaseUser.emailVerified,
   };
 
   await setDoc(doc(db, 'users', firebaseUser.uid), {
-    ...userData,
-    createdAt: userData.createdAt.toISOString(),
+    id: userData.id,
+    email: userData.email,
+    displayName: userData.displayName,
+    streak: 0,
     lastStudyDate: null,
+    notificationSettings: userData.notificationSettings,
+    createdAt: userData.createdAt.toISOString(),
   });
 
   return userData;
@@ -74,6 +131,7 @@ export const signIn = async (email: string, password: string): Promise<User> => 
         frequency: 'daily',
       },
       createdAt: new Date(data.createdAt),
+      emailVerified: firebaseUser.emailVerified,
     };
   }
 
@@ -90,12 +148,17 @@ export const signIn = async (email: string, password: string): Promise<User> => 
       frequency: 'daily',
     },
     createdAt: new Date(),
+    emailVerified: firebaseUser.emailVerified,
   };
 
   await setDoc(doc(db, 'users', firebaseUser.uid), {
-    ...userData,
-    createdAt: userData.createdAt.toISOString(),
+    id: userData.id,
+    email: userData.email,
+    displayName: userData.displayName,
+    streak: 0,
     lastStudyDate: null,
+    notificationSettings: userData.notificationSettings,
+    createdAt: userData.createdAt.toISOString(),
   });
 
   return userData;
@@ -125,10 +188,12 @@ export const signInWithGoogleIdToken = async (idToken: string): Promise<User> =>
         frequency: 'daily',
       },
       createdAt: new Date(data.createdAt),
+      emailVerified: firebaseUser.emailVerified,
     };
   }
 
   // First sign-in for this Google account — create the Firestore profile.
+  // Google has already verified the email, so emailVerified is true.
   const userData: User = {
     id: firebaseUser.uid,
     email: firebaseUser.email || '',
@@ -141,12 +206,17 @@ export const signInWithGoogleIdToken = async (idToken: string): Promise<User> =>
       frequency: 'daily',
     },
     createdAt: new Date(),
+    emailVerified: firebaseUser.emailVerified,
   };
 
   await setDoc(userDocRef, {
-    ...userData,
-    createdAt: userData.createdAt.toISOString(),
+    id: userData.id,
+    email: userData.email,
+    displayName: userData.displayName,
+    streak: 0,
     lastStudyDate: null,
+    notificationSettings: userData.notificationSettings,
+    createdAt: userData.createdAt.toISOString(),
   });
 
   return userData;
@@ -178,7 +248,27 @@ export const getCurrentUser = async (): Promise<User | null> => {
       frequency: 'daily',
     },
     createdAt: new Date(data.createdAt),
+    emailVerified: firebaseUser.emailVerified,
   };
+};
+
+// Resend the email verification link to the currently signed-in user.
+// Throws if no user is signed in or rate-limited.
+export const resendVerificationEmail = async (): Promise<void> => {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) throw new Error('You are not signed in.');
+  if (firebaseUser.emailVerified) return; // already verified, nothing to send
+  await sendEmailVerification(firebaseUser);
+};
+
+// Force a refresh of the cached Firebase user (so emailVerified picks up
+// after the user clicks the link). Returns the latest User snapshot, or
+// null if not signed in.
+export const reloadAuthUser = async (): Promise<User | null> => {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) return null;
+  await firebaseUser.reload();
+  return getCurrentUser();
 };
 
 // Subscribe to auth state changes

@@ -20,6 +20,8 @@ interface UserState {
   sendPasswordReset: (email: string) => Promise<void>;
   setUser: (user: User | null) => void;
   updateStreak: () => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
+  reloadAuthUser: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -36,11 +38,8 @@ export const useUserStore = create<UserState>()(
         try {
           const user = await authService.signIn(email, password);
           set({ user, isAuthenticated: true, isLoading: false });
-        } catch (error: any) {
-          set({
-            error: error.message || 'Failed to sign in',
-            isLoading: false,
-          });
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error), isLoading: false });
           throw error;
         }
       },
@@ -50,11 +49,8 @@ export const useUserStore = create<UserState>()(
         try {
           const user = await authService.signUp(email, password, displayName);
           set({ user, isAuthenticated: true, isLoading: false });
-        } catch (error: any) {
-          set({
-            error: error.message || 'Failed to sign up',
-            isLoading: false,
-          });
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error), isLoading: false });
           throw error;
         }
       },
@@ -64,11 +60,8 @@ export const useUserStore = create<UserState>()(
         try {
           const user = await authService.signInWithGoogleIdToken(idToken);
           set({ user, isAuthenticated: true, isLoading: false });
-        } catch (error: any) {
-          set({
-            error: error.message || 'Google sign-in failed',
-            isLoading: false,
-          });
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error), isLoading: false });
           throw error;
         }
       },
@@ -78,11 +71,8 @@ export const useUserStore = create<UserState>()(
         try {
           await authService.signOut();
           set({ user: null, isAuthenticated: false, isLoading: false });
-        } catch (error: any) {
-          set({
-            error: error.message || 'Failed to sign out',
-            isLoading: false,
-          });
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error), isLoading: false });
         }
       },
 
@@ -97,14 +87,8 @@ export const useUserStore = create<UserState>()(
           }
           await authService.deleteAccount(currentPassword);
           set({ user: null, isAuthenticated: false, isLoading: false });
-        } catch (error: any) {
-          const message =
-            error?.code === 'auth/wrong-password' || error?.code === 'auth/invalid-credential'
-              ? 'Incorrect password.'
-              : error?.code === 'auth/too-many-requests'
-                ? 'Too many attempts. Try again in a few minutes.'
-                : error?.message || 'Failed to delete account';
-          set({ error: message, isLoading: false });
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error), isLoading: false });
           throw error;
         }
       },
@@ -113,14 +97,33 @@ export const useUserStore = create<UserState>()(
         set({ error: null });
         try {
           await authService.sendPasswordReset(email);
-        } catch (error: any) {
-          set({ error: error.message || 'Failed to send reset email' });
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error) });
           throw error;
         }
       },
 
       setUser: (user: User | null) => {
         set({ user, isAuthenticated: !!user });
+      },
+
+      resendVerificationEmail: async () => {
+        set({ error: null });
+        try {
+          await authService.resendVerificationEmail();
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error) });
+          throw error;
+        }
+      },
+
+      reloadAuthUser: async () => {
+        try {
+          const refreshed = await authService.reloadAuthUser();
+          if (refreshed) set({ user: refreshed });
+        } catch (error: unknown) {
+          set({ error: authService.mapAuthError(error) });
+        }
       },
 
       updateStreak: async () => {

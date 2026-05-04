@@ -40,6 +40,7 @@ export default function HomeScreen() {
   // We read currentCards lazily via getState() inside the seed effect below.
   const userDisplayName = useUserStore((s) => s.user?.displayName);
   const userStreak = useUserStore((s) => s.user?.streak);
+  const userEmailVerified = useUserStore((s) => s.user?.emailVerified ?? true);
   const isAuthenticated = useUserStore((s) => s.isAuthenticated);
   const vocabularies = useVocabStore((s) => s.vocabularies);
   const isLoading = useVocabStore((s) => s.isLoading);
@@ -206,6 +207,9 @@ export default function HomeScreen() {
           frequency: 'daily',
         },
         createdAt: new Date(),
+        // Guests don't have a real email to verify; treat as verified so the
+        // verification banner doesn't show up in guest mode.
+        emailVerified: true,
       },
       isAuthenticated: true,
     });
@@ -335,6 +339,8 @@ export default function HomeScreen() {
         </View>
         {typeof userStreak === 'number' && <StreakBadge streak={userStreak} size="small" />}
       </View>
+
+      {!userEmailVerified && <VerifyEmailBanner />}
 
       <ScrollView
         horizontal
@@ -546,6 +552,68 @@ const ActionPill: React.FC<{
   </Pressable>
 );
 
+const VerifyEmailBanner: React.FC = () => {
+  const resendVerificationEmail = useUserStore((s) => s.resendVerificationEmail);
+  const reloadAuthUser = useUserStore((s) => s.reloadAuthUser);
+  const [busy, setBusy] = useState<'resend' | 'reload' | null>(null);
+  const [sentAt, setSentAt] = useState<number | null>(null);
+
+  const handleResend = async () => {
+    setBusy('resend');
+    try {
+      await resendVerificationEmail();
+      setSentAt(Date.now());
+    } catch {
+      // Error message is already routed into userStore.error.
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleReload = async () => {
+    setBusy('reload');
+    try {
+      await reloadAuthUser();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const justSent = sentAt && Date.now() - sentAt < 60_000;
+
+  return (
+    <View style={styles.verifyBanner}>
+      <View style={styles.verifyIcon}>
+        <MaterialCommunityIcons name="email-alert" size={18} color={NEO.ink} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.verifyTitle}>VERIFY YOUR EMAIL</Text>
+        <Text style={styles.verifyBody}>
+          {justSent
+            ? 'Check your inbox for the verification link.'
+            : 'Confirm your email to secure your account.'}
+        </Text>
+      </View>
+      <Pressable
+        onPress={handleResend}
+        disabled={busy !== null}
+        hitSlop={6}
+        style={({ pressed }) => [styles.verifyAction, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.verifyActionText}>{busy === 'resend' ? '…' : 'RESEND'}</Text>
+      </Pressable>
+      <Pressable
+        onPress={handleReload}
+        disabled={busy !== null}
+        hitSlop={6}
+        style={({ pressed }) => [styles.verifyActionPrimary, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.verifyActionPrimaryText}>{busy === 'reload' ? '…' : "I'M IN"}</Text>
+      </Pressable>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
@@ -569,6 +637,67 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+
+  verifyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: NEO.yellow,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+  },
+  verifyIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  verifyTitle: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 1,
+  },
+  verifyBody: {
+    fontSize: 11,
+    color: NEO.ink,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  verifyAction: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  verifyActionText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 0.8,
+  },
+  verifyActionPrimary: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BRUTAL.radius,
+    borderWidth: BRUTAL.border,
+    borderColor: NEO.ink,
+    backgroundColor: NEO.lime,
+  },
+  verifyActionPrimaryText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: NEO.ink,
+    letterSpacing: 0.8,
   },
 
   sectionRow: {
